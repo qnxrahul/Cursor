@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject } from 'rxjs';
-import { HttpAgent, RunAgentInput, EventType, type BaseEvent } from '@ag-ui/client';
+import { HttpAgent, RunAgentInput, EventType } from '@ag-ui/client';
 
 export interface AguiMessage {
   role: 'assistant' | 'user';
@@ -34,8 +34,8 @@ export class AguiService {
     const events$ = this.agent.run(runInput);
     this.subscribeToEvents(events$);
   }
-  private subscribeToEvents(events$: import('rxjs').Observable<BaseEvent>) {
-    events$.subscribe((e: any) => {
+  private subscribeToEvents(events$: any) {
+    (events$ as any).subscribe((e: any) => {
       switch (e.type) {
         case EventType.RUN_STARTED:
           if (e.thread_id) this.threadId$.next(e.thread_id);
