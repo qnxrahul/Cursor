@@ -20,8 +20,8 @@ export class AguiService {
       thread_id: threadId || undefined,
       messages: [],
     } as any;
-    const events$ = this.agent.run(runInput);
-    this.subscribeToEvents(events$);
+    const events$ = (this.agent as any).run(runInput);
+    (events$ as any).subscribe((e: any) => this.onEvent(e));
   }
 
   send(text: string) {
@@ -31,37 +31,35 @@ export class AguiService {
         { role: 'user', content: text },
       ] as any,
     } as any;
-    const events$ = this.agent.run(runInput);
-    this.subscribeToEvents(events$);
+    const events$ = (this.agent as any).run(runInput);
+    (events$ as any).subscribe((e: any) => this.onEvent(e));
   }
-  private subscribeToEvents(events$: any) {
-    (events$ as any).subscribe((e: any) => {
-      switch (e.type) {
-        case EventType.RUN_STARTED:
-          if (e.thread_id) this.threadId$.next(e.thread_id);
-          break;
-        case EventType.TEXT_MESSAGE_START: {
-          const msgs = this.messages$.value;
-          this.messages$.next([...msgs, { role: 'assistant', text: '' }]);
-          break;
-        }
-        case EventType.TEXT_MESSAGE_CONTENT: {
-          const msgs = this.messages$.value.slice();
-          if (msgs.length > 0) {
-            const last = msgs[msgs.length - 1];
-            if (last.role === 'assistant') last.text += e.delta || '';
-            this.messages$.next(msgs);
-          }
-          break;
-        }
-        case EventType.STATE_SNAPSHOT: {
-          if (e.snapshot) this.state$.next(e.snapshot as any);
-          break;
-        }
-        default:
-          break;
+  private onEvent(e: any) {
+    switch (e.type) {
+      case EventType.RUN_STARTED:
+        if (e.thread_id) this.threadId$.next(e.thread_id);
+        break;
+      case EventType.TEXT_MESSAGE_START: {
+        const msgs = this.messages$.value;
+        this.messages$.next([...msgs, { role: 'assistant', text: '' }]);
+        break;
       }
-    });
+      case EventType.TEXT_MESSAGE_CONTENT: {
+        const msgs = this.messages$.value.slice();
+        if (msgs.length > 0) {
+          const last = msgs[msgs.length - 1];
+          if (last.role === 'assistant') last.text += e.delta || '';
+          this.messages$.next(msgs);
+        }
+        break;
+      }
+      case EventType.STATE_SNAPSHOT: {
+        if (e.snapshot) this.state$.next(e.snapshot as any);
+        break;
+      }
+      default:
+        break;
+    }
   }
 }
 
