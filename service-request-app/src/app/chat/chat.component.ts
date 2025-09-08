@@ -24,7 +24,7 @@ export class ChatComponent {
     this.agent.start().subscribe((res: StartChatResponse) => {
       this.threadId = res.thread_id;
       this.currentFieldKey = res.field_key;
-      this.messages.push({ role: 'agent', text: res.message });
+      this.messages = [{ role: 'agent', text: res.message }];
     });
   }
 

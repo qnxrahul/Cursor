@@ -1,15 +1,17 @@
-import { Component } from '@angular/core';
+import { Component, OnDestroy } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { AgentService, RespondResponse, StartChatResponse } from '../services/agent.service';
+import { Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-service-request-form',
   templateUrl: './service-request-form.component.html'
 })
-export class ServiceRequestFormComponent {
+export class ServiceRequestFormComponent implements OnDestroy {
   form: FormGroup;
   threadId: string | null = null;
   done = false;
+  private subs: Subscription[] = [];
 
   constructor(private fb: FormBuilder, private agent: AgentService) {
     this.form = this.fb.group({
@@ -22,9 +24,16 @@ export class ServiceRequestFormComponent {
     });
 
     // Start chat to get first prompt
-    this.agent.start().subscribe((res: StartChatResponse) => {
-      this.threadId = res.thread_id;
+    const s1 = this.agent.threadId$.subscribe((tid) => (this.threadId = tid));
+    const s2 = this.agent.formPartial$.subscribe((partial) => {
+      Object.entries(partial).forEach(([k, v]) => {
+        if (this.form.controls[k]) this.form.controls[k].setValue(v);
+      });
     });
+    const s3 = this.agent.done$.subscribe((d) => (this.done = d));
+    this.subs.push(s1, s2, s3);
+    // Ensure a session exists
+    this.agent.start().subscribe();
   }
 
   onUserReply(input: string): void {
@@ -50,6 +59,10 @@ export class ServiceRequestFormComponent {
       console.log('Submit payload', this.form.value);
       // TODO: send to a submit endpoint if needed
     }
+  }
+
+  ngOnDestroy(): void {
+    this.subs.forEach((s) => s.unsubscribe());
   }
 }
 
