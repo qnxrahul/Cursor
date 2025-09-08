@@ -1,18 +1,78 @@
-INFO:     Started server process [5734]
+INFO:     Started server process [22807]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
 INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
-INFO:     127.0.0.1:44430 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:55436 - "POST /api/chat/start HTTP/1.1" 200 OK
-INFO:     127.0.0.1:47008 - "POST /api/chat/start HTTP/1.1" 200 OK
-INFO:     127.0.0.1:47016 - "POST /api/chat/start HTTP/1.1" 200 OK
-INFO:     127.0.0.1:40518 - "POST /api/chat/start HTTP/1.1" 200 OK
-INFO:     127.0.0.1:40532 - "POST /api/chat/start HTTP/1.1" 200 OK
-INFO:     127.0.0.1:40544 - "POST /api/chat/start HTTP/1.1" 200 OK
-INFO:     127.0.0.1:57860 - "POST /api/chat/start HTTP/1.1" 200 OK
-INFO:     127.0.0.1:57864 - "POST /api/chat/respond HTTP/1.1" 200 OK
-INFO:     127.0.0.1:57866 - "POST /api/chat/respond HTTP/1.1" 200 OK
-INFO:     127.0.0.1:57882 - "POST /api/chat/respond HTTP/1.1" 200 OK
-INFO:     127.0.0.1:57888 - "POST /api/chat/respond HTTP/1.1" 200 OK
-INFO:     127.0.0.1:57892 - "POST /api/chat/respond HTTP/1.1" 200 OK
-INFO:     127.0.0.1:57906 - "POST /api/chat/respond HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34230 - "POST /agent HTTP/1.1" 422 Unprocessable Content
+INFO:     127.0.0.1:37988 - "POST /agent HTTP/1.1" 422 Unprocessable Content
+INFO:     127.0.0.1:47978 - "POST /agent HTTP/1.1" 200 OK
+ERROR:    Exception in ASGI application
+  + Exception Group Traceback (most recent call last):
+  |   File "/home/ubuntu/.local/lib/python3.13/site-packages/uvicorn/protocols/http/httptools_impl.py", line 401, in run_asgi
+  |     result = await app(  # type: ignore[func-returns-value]
+  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |         self.scope, self.receive, self.send
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |     )
+  |     ^
+  |   File "/home/ubuntu/.local/lib/python3.13/site-packages/uvicorn/middleware/proxy_headers.py", line 60, in __call__
+  |     return await self.app(scope, receive, send)
+  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |   File "/home/ubuntu/.local/lib/python3.13/site-packages/fastapi/applications.py", line 1054, in __call__
+  |     await super().__call__(scope, receive, send)
+  |   File "/home/ubuntu/.local/lib/python3.13/site-packages/starlette/applications.py", line 113, in __call__
+  |     await self.middleware_stack(scope, receive, send)
+  |   File "/home/ubuntu/.local/lib/python3.13/site-packages/starlette/middleware/errors.py", line 187, in __call__
+  |     raise exc
+  |   File "/home/ubuntu/.local/lib/python3.13/site-packages/starlette/middleware/errors.py", line 165, in __call__
+  |     await self.app(scope, receive, _send)
+  |   File "/home/ubuntu/.local/lib/python3.13/site-packages/starlette/middleware/cors.py", line 85, in __call__
+  |     await self.app(scope, receive, send)
+  |   File "/home/ubuntu/.local/lib/python3.13/site-packages/starlette/middleware/exceptions.py", line 62, in __call__
+  |     await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  |   File "/home/ubuntu/.local/lib/python3.13/site-packages/starlette/_exception_handler.py", line 62, in wrapped_app
+  |     raise exc
+  |   File "/home/ubuntu/.local/lib/python3.13/site-packages/starlette/_exception_handler.py", line 51, in wrapped_app
+  |     await app(scope, receive, sender)
+  |   File "/home/ubuntu/.local/lib/python3.13/site-packages/starlette/routing.py", line 715, in __call__
+  |     await self.middleware_stack(scope, receive, send)
+  |   File "/home/ubuntu/.local/lib/python3.13/site-packages/starlette/routing.py", line 735, in app
+  |     await route.handle(scope, receive, send)
+  |   File "/home/ubuntu/.local/lib/python3.13/site-packages/starlette/routing.py", line 288, in handle
+  |     await self.app(scope, receive, send)
+  |   File "/home/ubuntu/.local/lib/python3.13/site-packages/starlette/routing.py", line 76, in app
+  |     await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  |   File "/home/ubuntu/.local/lib/python3.13/site-packages/starlette/_exception_handler.py", line 62, in wrapped_app
+  |     raise exc
+  |   File "/home/ubuntu/.local/lib/python3.13/site-packages/starlette/_exception_handler.py", line 51, in wrapped_app
+  |     await app(scope, receive, sender)
+  |   File "/home/ubuntu/.local/lib/python3.13/site-packages/starlette/routing.py", line 74, in app
+  |     await response(scope, receive, send)
+  |   File "/home/ubuntu/.local/lib/python3.13/site-packages/starlette/responses.py", line 252, in __call__
+  |     async with anyio.create_task_group() as task_group:
+  |                ~~~~~~~~~~~~~~~~~~~~~~~^^
+  |   File "/home/ubuntu/.local/lib/python3.13/site-packages/anyio/_backends/_asyncio.py", line 772, in __aexit__
+  |     raise BaseExceptionGroup(
+  |         "unhandled errors in a TaskGroup", self._exceptions
+  |     ) from None
+  | ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)
+  +-+---------------- 1 ----------------
+    | Traceback (most recent call last):
+    |   File "/home/ubuntu/.local/lib/python3.13/site-packages/starlette/responses.py", line 255, in wrap
+    |     await func()
+    |   File "/home/ubuntu/.local/lib/python3.13/site-packages/starlette/responses.py", line 244, in stream_response
+    |     async for chunk in self.body_iterator:
+    |     ...<2 lines>...
+    |         await send({"type": "http.response.body", "body": chunk, "more_body": True})
+    |   File "/home/ubuntu/.local/lib/python3.13/site-packages/ag_ui_langgraph/endpoint.py", line 21, in event_generator
+    |     async for event in agent.run(input_data):
+    |         yield encoder.encode(event)
+    |   File "/home/ubuntu/.local/lib/python3.13/site-packages/ag_ui_langgraph/agent.py", line 98, in run
+    |     async for event_str in self._handle_stream_events(input.copy(update={"forwarded_props": forwarded_props})):
+    |         yield event_str
+    |   File "/home/ubuntu/.local/lib/python3.13/site-packages/ag_ui_langgraph/agent.py", line 247, in _handle_stream_events
+    |     messages=langchain_messages_to_agui(state_values.get("messages", [])),
+    |              ~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/home/ubuntu/.local/lib/python3.13/site-packages/ag_ui_langgraph/utils.py", line 89, in langchain_messages_to_agui
+    |     raise TypeError(f"Unsupported message type: {type(message)}")
+    | TypeError: Unsupported message type: <class 'dict'>
+    +------------------------------------

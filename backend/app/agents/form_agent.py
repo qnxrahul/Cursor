@@ -68,14 +68,27 @@ def build_form_agent_graph():
     async def process_user(state: Dict[str, Any]):
         state = ensure_state_defaults(state)
         idx = state["next_field_index"]
-        if idx < len(FIELDS):
-            field_key, _ = FIELDS[idx]
-            # Last message is expected to be user's answer
-            user_messages = [m for m in state.get("messages", []) if m.get("role") == "user"]
-            if user_messages:
-                last = user_messages[-1]
-                state["form"][field_key] = last.get("content")
-                state["next_field_index"] = idx + 1
+        if idx >= len(FIELDS):
+            return state
+
+        field_key, _ = FIELDS[idx]
+        messages = state.get("messages", [])
+        if not messages:
+            return state
+
+        last = messages[-1]
+        # Support both dict-shaped and LangChain BaseMessage objects
+        if isinstance(last, dict):
+            last_role = last.get("role")
+            content = last.get("content")
+        else:
+            msg_type = getattr(last, "type", None) or last.__class__.__name__.lower()
+            last_role = "user" if msg_type == "human" else "assistant"
+            content = getattr(last, "content", None)
+
+        if last_role == "user" and content:
+            state["form"][field_key] = content
+            state["next_field_index"] = idx + 1
         return state
 
     async def llm_ack(state: Dict[str, Any]):
@@ -106,9 +119,15 @@ def build_form_agent_graph():
 
     def choose_next(state: Dict[str, Any]):
         messages = state.get("messages", [])
-        if messages and messages[-1].get("role") == "user":
-            return "process"
-        return "ask"
+        if not messages:
+            return "ask"
+        last = messages[-1]
+        if isinstance(last, dict):
+            last_role = last.get("role")
+        else:
+            msg_type = getattr(last, "type", None) or last.__class__.__name__.lower()
+            last_role = "user" if msg_type == "human" else "assistant"
+        return "process" if last_role == "user" else "ask"
 
     graph = StateGraph(dict)
     graph.add_node("ask", ask_or_finish)
