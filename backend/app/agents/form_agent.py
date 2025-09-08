@@ -4,6 +4,7 @@ from typing import Any, Dict, List
 import os
 
 from langgraph.graph import StateGraph, MessagesState
+from langgraph.checkpoint.memory import MemorySaver
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage
 
@@ -120,5 +121,6 @@ def build_form_agent_graph():
     graph.add_edge("process", "ack")
     graph.add_edge("ack", "ask")
 
-    return graph.compile()
+    checkpointer = MemorySaver()
+    return graph.compile(checkpointer=checkpointer)
 
