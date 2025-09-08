@@ -2,18 +2,19 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import uuid
-from ag_ui_langgraph import add_langgraph_fastapi_endpoint
+from ag_ui_langgraph import add_langgraph_fastapi_endpoint, LangGraphAgent
 from app.agents.form_agent import build_form_agent_graph, FIELDS
 
 router = APIRouter()
 
 
 graph = build_form_agent_graph()
+agui_agent = LangGraphAgent(name="form-agent", graph=graph)
 
 
 def include_agent_routes(app):
     # Mount AG-UI-compatible streaming endpoint
-    add_langgraph_fastapi_endpoint(app, graph, "/agent")
+    add_langgraph_fastapi_endpoint(app, agui_agent, "/agent")
     app.include_router(router)
     return app
 

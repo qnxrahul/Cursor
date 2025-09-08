@@ -7,12 +7,14 @@ import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
 import { ServiceRequestFormComponent } from './service-request-form/service-request-form.component';
 import { ChatComponent } from './chat/chat.component';
+import { AguiChatComponent } from './agui-chat/agui-chat.component';
 
 @NgModule({
   declarations: [
     AppComponent,
     ServiceRequestFormComponent,
-    ChatComponent
+    ChatComponent,
+    AguiChatComponent
   ],
   imports: [
     BrowserModule,
