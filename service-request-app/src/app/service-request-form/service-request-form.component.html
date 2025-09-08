@@ -1,0 +1,27 @@
+<form [formGroup]="form" (ngSubmit)="submit()">
+  <label>Name</label>
+  <input formControlName="name" />
+
+  <label>Email</label>
+  <input type="email" formControlName="email" />
+
+  <label>Issue Details</label>
+  <textarea formControlName="issue_details"></textarea>
+
+  <label>Type</label>
+  <input formControlName="type" />
+
+  <label>Urgency</label>
+  <input formControlName="urgency" />
+
+  <label>Location</label>
+  <input formControlName="location" />
+
+  <button type="submit" [disabled]="!form.valid">Submit</button>
+</form>
+
+<div>
+  <input #reply placeholder="Answer the agent..." (keyup.enter)="onUserReply(reply.value); reply.value=''" />
+  <button (click)="onUserReply(reply.value); reply.value=''">Send</button>
+</div>
+
