@@ -136,17 +136,36 @@ def build_form_agent_graph():
         logger.debug("choose_next: no qualifying role found -> ask")
         return "ask"
 
+    async def sanitize_incoming(state: Dict[str, Any]):
+        # Keep only the most recent human message; drop any assistant messages coming from client
+        state = ensure_state_defaults(state)
+        msgs = list(state.get("messages", []))
+        last_human = None
+        for msg in reversed(msgs):
+            if isinstance(msg, dict):
+                role = msg.get("role")
+            else:
+                t = getattr(msg, "type", None) or msg.__class__.__name__.lower()
+                role = "user" if t == "human" else "assistant"
+            if role == "user":
+                last_human = msg
+                break
+        new_msgs = [last_human] if last_human is not None else []
+        logger.debug("sanitize_incoming: incoming=%s kept=%s", len(msgs), len(new_msgs))
+        return {"messages": new_msgs}
+
     graph = StateGraph(dict)
     graph.add_node("ask", ask_or_finish)
     graph.add_node("cleanup", cleanup_messages)
     graph.add_node("process", process_user)
     graph.add_node("router", router_node)
-    graph.set_entry_point("router")
+    graph.add_node("sanitize", sanitize_incoming)
+    graph.set_entry_point("sanitize")
 
     graph.add_conditional_edges("router", choose_next, {"ask": "ask", "process": "process"})
     graph.add_edge("process", "ask")
     graph.add_edge("ask", "cleanup")
-    # entry node removed to avoid wiping incoming user messages
+    graph.add_edge("sanitize", "router")
 
     checkpointer = MemorySaver()
     compiled = graph.compile(checkpointer=checkpointer)
