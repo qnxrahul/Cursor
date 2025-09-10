@@ -113,7 +113,8 @@ def build_form_agent_graph():
     graph.add_node("router", router_node)
     graph.set_entry_point("router")
 
-    graph.add_conditional_edges("router", choose_next, {"ask": "ask", "process": "ask"})
+    graph.add_conditional_edges("router", choose_next, {"ask": "ask", "process": "process"})
+    graph.add_edge("process", "ask")
 
     checkpointer = MemorySaver()
     return graph.compile(checkpointer=checkpointer)
