@@ -62,6 +62,10 @@ def build_form_agent_graph():
             ]
         }
 
+    async def cleanup_messages(state: Dict[str, Any]):
+        # Ensure messages are not persisted in the checkpoint to avoid regenerate mode
+        return {"messages": []}
+
     async def process_user(state: Dict[str, Any]):
         state = ensure_state_defaults(state)
         idx = state["next_field_index"]
@@ -109,12 +113,14 @@ def build_form_agent_graph():
 
     graph = StateGraph(FormState)
     graph.add_node("ask", ask_or_finish)
+    graph.add_node("cleanup", cleanup_messages)
     graph.add_node("process", process_user)
     graph.add_node("router", router_node)
     graph.set_entry_point("router")
 
     graph.add_conditional_edges("router", choose_next, {"ask": "ask", "process": "process"})
     graph.add_edge("process", "ask")
+    graph.add_edge("ask", "cleanup")
 
     checkpointer = MemorySaver()
     return graph.compile(checkpointer=checkpointer)
