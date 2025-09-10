@@ -73,6 +73,35 @@ export class AguiService {
       }
       case EventType.STATE_SNAPSHOT: {
         if (e.snapshot) this.state$.next(e.snapshot as any);
+        // Fallback: if no text streaming, try to reflect last assistant/user from LC-style snapshot
+        const msgs = (e.snapshot?.messages || []) as any[];
+        if (Array.isArray(msgs) && msgs.length > 0) {
+          const mapped = msgs
+            .map((m: any) => {
+              const t = m?.type;
+              if (t === 'human') return { role: 'user', text: m?.content ?? '' };
+              if (t === 'ai') return { role: 'assistant', text: m?.content ?? '' };
+              return null;
+            })
+            .filter(Boolean) as AguiMessage[];
+          if (mapped.length) this.messages$.next(mapped);
+        }
+        break;
+      }
+      case EventType.MESSAGES_SNAPSHOT: {
+        const msgs = (e.messages || []) as any[];
+        if (Array.isArray(msgs)) {
+          const mapped = msgs
+            .map((m: any) => {
+              const role = m?.role;
+              if (role === 'user' || role === 'assistant') {
+                return { role, text: m?.content ?? '' } as AguiMessage;
+              }
+              return null;
+            })
+            .filter(Boolean) as AguiMessage[];
+          if (mapped.length) this.messages$.next(mapped);
+        }
         break;
       }
       default:
