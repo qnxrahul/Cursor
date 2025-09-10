@@ -113,7 +113,7 @@ def build_form_agent_graph():
 
 
     def router_node(state: Dict[str, Any]):
-        state = ensure_state_defaults(state)
+        # Pure router: do not mutate persisted state
         logger.debug("router_node: next=%s, msgs=%s", state.get("next_field_index"), len(state.get("messages", [])))
         return state
 
@@ -138,7 +138,6 @@ def build_form_agent_graph():
 
     async def sanitize_incoming(state: Dict[str, Any]):
         # Keep only the most recent human message; drop any assistant messages coming from client
-        state = ensure_state_defaults(state)
         msgs = list(state.get("messages", []))
         last_human = None
         for msg in reversed(msgs):

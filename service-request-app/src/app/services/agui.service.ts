@@ -39,7 +39,7 @@ export class AguiService {
       messages: [],
       tools: [],
       context: [],
-      forwardedProps: { node_name: "__end__", command: {} }
+      forwardedProps: { node_name: "end", command: {} }
     };
     const events$ = (this.agent as any).run(runInput);
     (events$ as any).subscribe((e: any) => this.onEvent(e));
@@ -55,21 +55,14 @@ export class AguiService {
     this.lastSentHash = hash;
     this.lastSentAt = now;
     // Do NOT optimistically render here; wait for server echoes to avoid dupes
-    const shadowAssistant = this.lastAssistantText
-      ? [{ id: this.uuid(), role: 'assistant', content: this.lastAssistantText }]
-      : [];
-
     const runInput: any = {
       threadId: tid,
       runId: this.uuid(),
       state: {},
-      messages: [
-        ...shadowAssistant,
-        { id: this.uuid(), role: 'user', content: text },
-      ],
+      messages: [{ id: this.uuid(), role: 'user', content: text }],
       tools: [],
       context: [],
-      forwardedProps: { node_name: "__end__", command: {} }
+      forwardedProps: { node_name: "end", command: {} }
     };
     const events$ = (this.agent as any).run(runInput);
     (events$ as any).subscribe((e: any) => this.onEvent(e));

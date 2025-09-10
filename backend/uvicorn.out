@@ -76,3 +76,7 @@ ERROR:    Exception in ASGI application
     |     raise TypeError(f"Unsupported message type: {type(message)}")
     | TypeError: Unsupported message type: <class 'dict'>
     +------------------------------------
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [22807]
