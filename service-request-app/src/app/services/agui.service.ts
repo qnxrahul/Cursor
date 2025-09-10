@@ -19,6 +19,8 @@ export class AguiService {
   private turnHasTextStream = false;
   private lastSnapshotHash: string | null = null;
   private started = false;
+  private lastSentHash: string | null = null;
+  private lastSentAt = 0;
 
   private uuid(): string {
     try { return (crypto as any).randomUUID(); } catch { return `id-${Date.now()}-${Math.random().toString(16).slice(2)}`; }
@@ -45,6 +47,12 @@ export class AguiService {
   send(text: string) {
     const tid = this.threadId$.value || this.uuid();
     this.threadId$.next(tid);
+    // Debounce duplicate rapid sends of identical text
+    const now = Date.now();
+    const hash = `user:${text}`;
+    if (this.lastSentHash === hash && now - this.lastSentAt < 1200) return;
+    this.lastSentHash = hash;
+    this.lastSentAt = now;
     // Optimistically show user text to avoid visual clearing
     this.appendMessage({ role: 'user', text });
     this.lastSnapshotHash = `user:${text}`;
@@ -127,6 +135,10 @@ export class AguiService {
         break;
       }
       default:
+        break;
+      case EventType.RUN_FINISHED:
+        // allow new sends after run finishes
+        this.turnHasTextStream = false;
         break;
     }
   }
