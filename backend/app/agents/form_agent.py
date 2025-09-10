@@ -69,7 +69,7 @@ def build_form_agent_graph():
             return state
 
         field_key, _ = FIELDS[idx]
-        messages = state.get("messages", [])
+        messages = list(state.get("messages", []))
         if not messages:
             return state
 
@@ -86,6 +86,9 @@ def build_form_agent_graph():
         if last_role == "user" and content:
             state["form"][field_key] = content
             state["next_field_index"] = idx + 1
+            # Clear messages so next node asks the next question cleanly
+            # but keep state(form/next_field_index) intact
+            state["messages"] = []
         return state
 
     async def llm_ack(state: Dict[str, Any]):
@@ -126,7 +129,7 @@ def build_form_agent_graph():
             last_role = "user" if msg_type == "human" else "assistant"
         return "process" if last_role == "user" else "ask"
 
-    graph = StateGraph(dict)
+    graph = StateGraph(FormState)
     graph.add_node("ask", ask_or_finish)
     graph.add_node("process", process_user)
     graph.add_node("ack", llm_ack)
