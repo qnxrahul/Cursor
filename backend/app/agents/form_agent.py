@@ -48,11 +48,13 @@ def build_form_agent_graph():
             state["form"] = {}
         if "next_field_index" not in state:
             state["next_field_index"] = 0
+        if "asked_index" not in state:
+            state["asked_index"] = -1
         return state
 
     async def ask_or_finish(state: Dict[str, Any]):
         state = ensure_state_defaults(state)
-        logger.debug("ask_or_finish: next_field_index=%s", state.get("next_field_index"))
+        logger.debug("ask_or_finish: next_field_index=%s asked_index=%s", state.get("next_field_index"), state.get("asked_index"))
         if state["next_field_index"] >= len(FIELDS):
             # All fields collected; summarize and end
             logger.debug("ask_or_finish: finished")
@@ -61,12 +63,15 @@ def build_form_agent_graph():
                     AIMessage(content="Thank you. All required details have been collected.")
                 ]
             }
-        field_key, prompt = FIELDS[state["next_field_index"]]
-        logger.debug("ask_or_finish: asking '%s'", field_key)
+        cur_idx = state["next_field_index"]
+        if state.get("asked_index") == cur_idx:
+            logger.debug("ask_or_finish: already asked for index %s, skipping emit", cur_idx)
+            return {}
+        field_key, prompt = FIELDS[cur_idx]
+        logger.debug("ask_or_finish: asking '%s' (idx=%s)", field_key, cur_idx)
         return {
-            "messages": [
-                AIMessage(content=prompt)
-            ]
+            "messages": [AIMessage(content=prompt)],
+            "asked_index": cur_idx
         }
 
     async def cleanup_messages(state: Dict[str, Any]):
@@ -131,23 +136,17 @@ def build_form_agent_graph():
         logger.debug("choose_next: no qualifying role found -> ask")
         return "ask"
 
-    async def entry_cleanup(state: Dict[str, Any]):
-        # purge any lingering messages right at run start
-        logger.debug("entry_cleanup: purge at run start")
-        return {"messages": []}
-
     graph = StateGraph(dict)
     graph.add_node("ask", ask_or_finish)
     graph.add_node("cleanup", cleanup_messages)
     graph.add_node("process", process_user)
     graph.add_node("router", router_node)
-    graph.add_node("entry", entry_cleanup)
-    graph.set_entry_point("entry")
+    graph.set_entry_point("router")
 
     graph.add_conditional_edges("router", choose_next, {"ask": "ask", "process": "process"})
     graph.add_edge("process", "ask")
     graph.add_edge("ask", "cleanup")
-    graph.add_edge("entry", "router")
+    # entry node removed to avoid wiping incoming user messages
 
     checkpointer = MemorySaver()
     compiled = graph.compile(checkpointer=checkpointer)
