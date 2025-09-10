@@ -22,6 +22,7 @@ export class AguiService {
   private lastSentHash: string | null = null;
   private lastSentAt = 0;
   private lastAssistantText: string | null = null;
+  private lastAssistantId: string | null = null;
 
   private uuid(): string {
     try { return (crypto as any).randomUUID(); } catch { return `id-${Date.now()}-${Math.random().toString(16).slice(2)}`; }
@@ -39,7 +40,7 @@ export class AguiService {
       messages: [],
       tools: [],
       context: [],
-      forwardedProps: { node_name: "__end__", command: {} }
+      forwardedProps: { node_name: "sanitize", command: {} }
     };
     const events$ = (this.agent as any).run(runInput);
     (events$ as any).subscribe((e: any) => this.onEvent(e));
@@ -55,8 +56,8 @@ export class AguiService {
     this.lastSentHash = hash;
     this.lastSentAt = now;
     // Include shadow assistant to keep message count >= checkpointed history
-    const shadowAssistant = this.lastAssistantText
-      ? [{ id: this.uuid(), role: 'assistant', content: this.lastAssistantText }]
+    const shadowAssistant = (this.lastAssistantText && this.lastAssistantId)
+      ? [{ id: this.lastAssistantId, role: 'assistant', content: this.lastAssistantText }]
       : [];
 
     // Do NOT optimistically render here; wait for server echoes to avoid dupes
@@ -70,7 +71,7 @@ export class AguiService {
       ],
       tools: [],
       context: [],
-      forwardedProps: { node_name: "__end__", command: {} }
+      forwardedProps: { node_name: "sanitize", command: {} }
     };
     const events$ = (this.agent as any).run(runInput);
     (events$ as any).subscribe((e: any) => this.onEvent(e));
@@ -120,7 +121,10 @@ export class AguiService {
             if (this.lastSnapshotHash !== hash) {
               this.appendMessage({ role, text: content });
               this.lastSnapshotHash = hash;
-              if (role === 'assistant') this.lastAssistantText = content;
+              if (role === 'assistant') {
+                this.lastAssistantText = content;
+                this.lastAssistantId = last?.id || null;
+              }
             }
           }
         }
@@ -138,7 +142,10 @@ export class AguiService {
             if (this.lastSnapshotHash !== hash) {
               this.appendMessage({ role, text });
               this.lastSnapshotHash = hash;
-              if (role === 'assistant') this.lastAssistantText = text;
+              if (role === 'assistant') {
+                this.lastAssistantText = text;
+                this.lastAssistantId = last?.id || null;
+              }
             }
           }
         }
