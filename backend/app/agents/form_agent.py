@@ -127,7 +127,7 @@ def build_form_agent_graph():
         logger.debug("choose_next: last_role=%s -> %s", last_role, decision)
         return decision
 
-    graph = StateGraph(FormState)
+    graph = StateGraph(dict)
     graph.add_node("ask", ask_or_finish)
     graph.add_node("cleanup", cleanup_messages)
     graph.add_node("process", process_user)
