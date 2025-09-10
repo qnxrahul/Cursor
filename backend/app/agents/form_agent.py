@@ -117,15 +117,19 @@ def build_form_agent_graph():
         if not messages:
             logger.debug("choose_next: no messages -> ask")
             return "ask"
-        last = messages[-1]
-        if isinstance(last, dict):
-            last_role = last.get("role")
-        else:
-            msg_type = getattr(last, "type", None) or last.__class__.__name__.lower()
-            last_role = "user" if msg_type == "human" else "assistant"
-        decision = "process" if last_role == "user" else "ask"
-        logger.debug("choose_next: last_role=%s -> %s", last_role, decision)
-        return decision
+        # Scan from the end to find the most recent human/assistant indicator
+        for msg in reversed(messages):
+            if isinstance(msg, dict):
+                role = msg.get("role")
+            else:
+                msg_type = getattr(msg, "type", None) or msg.__class__.__name__.lower()
+                role = "user" if msg_type == "human" else "assistant"
+            if role in ("user", "assistant"):
+                decision = "process" if role == "user" else "ask"
+                logger.debug("choose_next: recent role=%s -> %s", role, decision)
+                return decision
+        logger.debug("choose_next: no qualifying role found -> ask")
+        return "ask"
 
     async def entry_cleanup(state: Dict[str, Any]):
         # purge any lingering messages right at run start
