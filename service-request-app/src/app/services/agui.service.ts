@@ -40,7 +40,7 @@ export class AguiService {
       messages: [],
       tools: [],
       context: [],
-      forwardedProps: { node_name: "sanitize", command: {} }
+      forwardedProps: { node_name: "entry_cleanup", command: {} }
     };
     const events$ = (this.agent as any).run(runInput);
     (events$ as any).subscribe((e: any) => this.onEvent(e));
@@ -64,14 +64,11 @@ export class AguiService {
     const runInput: any = {
       threadId: tid,
       runId: this.uuid(),
-      state: {},
-      messages: [
-        ...shadowAssistant,
-        { id: this.uuid(), role: 'user', content: text }
-      ],
+      state: { pending_user_text: text },
+      messages: [],
       tools: [],
       context: [],
-      forwardedProps: { node_name: "sanitize", command: {} }
+      forwardedProps: { node_name: "entry_cleanup", command: {} }
     };
     const events$ = (this.agent as any).run(runInput);
     (events$ as any).subscribe((e: any) => this.onEvent(e));

@@ -87,29 +87,32 @@ def build_form_agent_graph():
             return state
 
         field_key, _ = FIELDS[idx]
+        # Prefer transient pending_user_text if present; otherwise fall back to last human message
+        pending = state.get("pending_user_text")
         messages = list(state.get("messages", []))
-        logger.debug("process_user: idx=%s, field=%s, messages=%s", idx, field_key, len(messages))
-        if not messages:
-            return state
-
-        last = messages[-1]
-        # Support both dict-shaped and LangChain BaseMessage objects
-        if isinstance(last, dict):
-            last_role = last.get("role")
-            content = last.get("content")
+        logger.debug("process_user: idx=%s, field=%s, has_pending=%s, messages=%s", idx, field_key, bool(pending), len(messages))
+        content = None
+        if pending:
+            content = str(pending)
         else:
-            msg_type = getattr(last, "type", None) or last.__class__.__name__.lower()
-            last_role = "user" if msg_type == "human" else "assistant"
-            content = getattr(last, "content", None)
-
-        logger.debug("process_user: last_role=%s content=%s", last_role, (content[:60] if isinstance(content, str) else str(content)))
-        if last_role == "user" and content:
-            state["form"][field_key] = content
-            state["next_field_index"] = idx + 1
-            # Clear messages so next node asks the next question cleanly
-            # but keep state(form/next_field_index) intact
-            state["messages"] = []
-            logger.debug("process_user: stored '%s', next=%s, cleared messages", field_key, state["next_field_index"])
+            if messages:
+                last = messages[-1]
+                if isinstance(last, dict):
+                    last_role = last.get("role")
+                    content = last.get("content") if last_role == "user" else None
+                else:
+                    msg_type = getattr(last, "type", None) or last.__class__.__name__.lower()
+                    last_role = "user" if msg_type == "human" else "assistant"
+                    if last_role == "user":
+                        content = getattr(last, "content", None)
+        if not content:
+            return state
+        state["form"][field_key] = content
+        state["next_field_index"] = idx + 1
+        # Clear transient inputs and messages so checkpoints never hold messages
+        state["pending_user_text"] = None
+        state["messages"] = []
+        logger.debug("process_user: stored '%s', next=%s, cleared messages", field_key, state["next_field_index"])
         return state
 
 
@@ -119,6 +122,9 @@ def build_form_agent_graph():
         return state
 
     def choose_next(state: Dict[str, Any]):
+        if state.get("pending_user_text"):
+            logger.debug("choose_next: pending_user_text present -> process")
+            return "process"
         messages = state.get("messages", [])
         if not messages:
             logger.debug("choose_next: no messages -> ask")
@@ -138,21 +144,27 @@ def build_form_agent_graph():
         return "ask"
 
     async def sanitize_incoming(state: Dict[str, Any]):
-        # Keep only the most recent human message; drop any assistant messages coming from client
+        # Move client-provided human content into a transient field and keep messages empty
         msgs = list(state.get("messages", []))
-        last_human = None
-        for msg in reversed(msgs):
-            if isinstance(msg, dict):
-                role = msg.get("role")
-            else:
-                t = getattr(msg, "type", None) or msg.__class__.__name__.lower()
-                role = "user" if t == "human" else "assistant"
-            if role == "user":
-                last_human = msg
-                break
-        new_msgs = [last_human] if last_human is not None else []
-        logger.debug("sanitize_incoming: incoming=%s kept=%s", len(msgs), len(new_msgs))
-        return {"messages": new_msgs}
+        content = state.get("pending_user_text")
+        if not content:
+            for msg in reversed(msgs):
+                if isinstance(msg, dict):
+                    role = msg.get("role")
+                    mcontent = msg.get("content")
+                else:
+                    t = getattr(msg, "type", None) or msg.__class__.__name__.lower()
+                    role = "user" if t == "human" else "assistant"
+                    mcontent = getattr(msg, "content", None)
+                if role == "user" and mcontent:
+                    content = mcontent
+                    break
+        logger.debug("sanitize_incoming: extracted_pending=%s from %s incoming msgs", bool(content), len(msgs))
+        return {"pending_user_text": content, "messages": []}
+
+    async def entry_cleanup(state: Dict[str, Any]):
+        logger.debug("entry_cleanup: purge messages at run start")
+        return {"messages": []}
 
     graph = StateGraph(FormState)
     graph.add_node("ask", ask_or_finish)
@@ -160,15 +172,17 @@ def build_form_agent_graph():
     graph.add_node("process", process_user)
     graph.add_node("router", router_node)
     graph.add_node("sanitize", sanitize_incoming)
-    graph.set_entry_point("sanitize")
+    graph.add_node("entry_cleanup", entry_cleanup)
+    graph.set_entry_point("entry_cleanup")
 
     graph.add_conditional_edges("router", choose_next, {"ask": "ask", "process": "process"})
     graph.add_edge("process", "ask")
     graph.add_edge("ask", "cleanup")
+    graph.add_edge("entry_cleanup", "sanitize")
     graph.add_edge("sanitize", "router")
 
     checkpointer = MemorySaver()
     compiled = graph.compile(checkpointer=checkpointer)
-    logger.info("Compiled form agent with MemorySaver; nodes: router, process, ask, cleanup")
+    logger.info("Compiled form agent with MemorySaver; nodes: entry_cleanup, sanitize, router, process, ask, cleanup")
     return compiled
 
