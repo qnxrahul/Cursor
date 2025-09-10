@@ -57,10 +57,8 @@ export class AguiService {
     if (this.lastSentHash === hash && now - this.lastSentAt < 1200) return;
     this.lastSentHash = hash;
     this.lastSentAt = now;
-    // Include shadow assistant to keep message count >= checkpointed history
-    const shadowAssistant = (this.lastAssistantText && this.lastAssistantId)
-      ? [{ id: this.lastAssistantId, role: 'assistant', content: this.lastAssistantText }]
-      : [];
+    // Optimistically render user's message (server will not echo human messages in this flow)
+    this.appendMessage({ role: 'user', text });
 
     // Do NOT optimistically render here; wait for server echoes to avoid dupes
     const runInput: any = {
