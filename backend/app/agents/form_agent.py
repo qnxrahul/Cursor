@@ -91,28 +91,6 @@ def build_form_agent_graph():
             state["messages"] = []
         return state
 
-    async def llm_ack(state: Dict[str, Any]):
-        state = ensure_state_defaults(state)
-        idx = max(0, state.get("next_field_index", 0) - 1)
-        if idx < len(FIELDS):
-            field_key, _ = FIELDS[idx]
-            field_value = state.get("form", {}).get(field_key, "")
-            content = f"Recorded {field_key}."
-            if llm is not None:
-                try:
-                    prompt = [
-                        SystemMessage(content=(
-                            "You are a helpful service desk agent. Acknowledge the user's answer succinctly (one short sentence). "
-                            "Do not ask the next question."
-                        )),
-                        HumanMessage(content=f"Field: {field_key}. Answer: {field_value}"),
-                    ]
-                    resp = await llm.ainvoke(prompt)
-                    content = getattr(resp, "content", None) or str(resp)
-                except Exception:
-                    pass
-            return {"messages": [AIMessage(content=content)]}
-        return {}
 
     def router_node(state: Dict[str, Any]):
         return ensure_state_defaults(state)
@@ -132,13 +110,10 @@ def build_form_agent_graph():
     graph = StateGraph(FormState)
     graph.add_node("ask", ask_or_finish)
     graph.add_node("process", process_user)
-    graph.add_node("ack", llm_ack)
     graph.add_node("router", router_node)
     graph.set_entry_point("router")
 
-    graph.add_conditional_edges("router", choose_next, {"ask": "ask", "process": "process"})
-    graph.add_edge("process", "ack")
-    graph.add_edge("ack", "ask")
+    graph.add_conditional_edges("router", choose_next, {"ask": "ask", "process": "ask"})
 
     checkpointer = MemorySaver()
     return graph.compile(checkpointer=checkpointer)
