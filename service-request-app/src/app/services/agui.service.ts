@@ -53,9 +53,7 @@ export class AguiService {
     if (this.lastSentHash === hash && now - this.lastSentAt < 1200) return;
     this.lastSentHash = hash;
     this.lastSentAt = now;
-    // Optimistically show user text to avoid visual clearing
-    this.appendMessage({ role: 'user', text });
-    this.lastSnapshotHash = `user:${text}`;
+    // Do NOT optimistically render here; wait for server echoes to avoid dupes
     const runInput: any = {
       threadId: tid,
       runId: this.uuid(),
