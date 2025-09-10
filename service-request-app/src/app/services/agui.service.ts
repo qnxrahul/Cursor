@@ -38,6 +38,8 @@ export class AguiService {
   send(text: string) {
     const tid = this.threadId$.value || this.uuid();
     this.threadId$.next(tid);
+    // Optimistically show user text to avoid visual clearing
+    this.appendMessage({ role: 'user', text });
     const runInput: any = {
       threadId: tid,
       runId: this.uuid(),
@@ -52,14 +54,19 @@ export class AguiService {
     const events$ = (this.agent as any).run(runInput);
     (events$ as any).subscribe((e: any) => this.onEvent(e));
   }
+
+  private appendMessage(m: AguiMessage) {
+    const arr = this.messages$.value.slice();
+    arr.push(m);
+    this.messages$.next(arr);
+  }
   private onEvent(e: any) {
     switch (e.type) {
       case EventType.RUN_STARTED:
         if (e.thread_id) this.threadId$.next(e.thread_id);
         break;
       case EventType.TEXT_MESSAGE_START: {
-        const msgs = this.messages$.value;
-        this.messages$.next([...msgs, { role: 'assistant', text: '' }]);
+        this.appendMessage({ role: 'assistant', text: '' });
         break;
       }
       case EventType.TEXT_MESSAGE_CONTENT: {
@@ -73,34 +80,24 @@ export class AguiService {
       }
       case EventType.STATE_SNAPSHOT: {
         if (e.snapshot) this.state$.next(e.snapshot as any);
-        // Fallback: if no text streaming, try to reflect last assistant/user from LC-style snapshot
+        // Fallback: append last LC-style message (do not overwrite transcript)
         const msgs = (e.snapshot?.messages || []) as any[];
         if (Array.isArray(msgs) && msgs.length > 0) {
-          const mapped = msgs
-            .map((m: any) => {
-              const t = m?.type;
-              if (t === 'human') return { role: 'user', text: m?.content ?? '' };
-              if (t === 'ai') return { role: 'assistant', text: m?.content ?? '' };
-              return null;
-            })
-            .filter(Boolean) as AguiMessage[];
-          if (mapped.length) this.messages$.next(mapped);
+          const last = msgs[msgs.length - 1];
+          const t = last?.type;
+          const content = last?.content ?? '';
+          if (t === 'human') this.appendMessage({ role: 'user', text: content });
+          else if (t === 'ai') this.appendMessage({ role: 'assistant', text: content });
         }
         break;
       }
       case EventType.MESSAGES_SNAPSHOT: {
         const msgs = (e.messages || []) as any[];
         if (Array.isArray(msgs)) {
-          const mapped = msgs
-            .map((m: any) => {
-              const role = m?.role;
-              if (role === 'user' || role === 'assistant') {
-                return { role, text: m?.content ?? '' } as AguiMessage;
-              }
-              return null;
-            })
-            .filter(Boolean) as AguiMessage[];
-          if (mapped.length) this.messages$.next(mapped);
+          const last = msgs[msgs.length - 1];
+          const role = last?.role;
+          const text = last?.content ?? '';
+          if (role === 'user' || role === 'assistant') this.appendMessage({ role, text });
         }
         break;
       }
