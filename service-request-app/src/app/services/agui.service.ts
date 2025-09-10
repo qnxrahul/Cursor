@@ -121,17 +121,57 @@ export class AguiService {
           if (Array.isArray((e.snapshot as any).messages)) next.messages = (e.snapshot as any).messages;
         }
         this.state$.next(next);
+        // Fallback to render assistant message if there was no streaming this turn
+        if (!this.turnHasTextStream) {
+          const msgs = (e.snapshot?.messages || []) as any[];
+          if (Array.isArray(msgs) && msgs.length > 0) {
+            const last = msgs[msgs.length - 1];
+            const t = last?.type;
+            const content = last?.content ?? '';
+            const role = t === 'human' ? 'user' : t === 'ai' ? 'assistant' : null as any;
+            if (role === 'assistant') {
+              const norm = String(content || '').trim();
+              const hash = `${role}:${norm}`;
+              if (this.lastSnapshotHash !== hash) {
+                const current = this.messages$.value;
+                const lastMsg = current[current.length - 1];
+                if (!(lastMsg && lastMsg.role === role && lastMsg.text.trim() === norm)) {
+                  this.appendMessage({ role, text: content });
+                }
+                this.lastSnapshotHash = hash;
+                this.lastAssistantText = content;
+                this.lastAssistantId = last?.id || null;
+              }
+            }
+          }
+        }
         break;
       }
       case EventType.MESSAGES_SNAPSHOT: {
-        // Do not append messages from snapshots to avoid duplicates; only update assistant tracking
         const msgs = (e.messages || []) as any[];
-        if (Array.isArray(msgs) && msgs.length > 0) {
+        if (Array.isArray(msgs) && !this.turnHasTextStream && msgs.length > 0) {
           const last = msgs[msgs.length - 1];
           const role = last?.role;
           const text = last?.content ?? '';
           if (role === 'assistant') {
-            this.lastAssistantText = text;
+            const norm = String(text || '').trim();
+            const hash = `${role}:${norm}`;
+            if (this.lastSnapshotHash !== hash) {
+              const current = this.messages$.value;
+              const lastMsg = current[current.length - 1];
+              if (!(lastMsg && lastMsg.role === role && lastMsg.text.trim() === norm)) {
+                this.appendMessage({ role, text });
+              }
+              this.lastSnapshotHash = hash;
+              this.lastAssistantText = text;
+              this.lastAssistantId = last?.id || null;
+            }
+          }
+        } else if (Array.isArray(msgs) && msgs.length > 0) {
+          // Even if streaming handled UI, keep assistant tracking in sync
+          const last = msgs[msgs.length - 1];
+          if (last?.role === 'assistant') {
+            this.lastAssistantText = last?.content ?? '';
             this.lastAssistantId = last?.id || null;
           }
         }
