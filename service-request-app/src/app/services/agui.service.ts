@@ -15,6 +15,10 @@ export class AguiService {
   readonly messages$ = new BehaviorSubject<AguiMessage[]>([]);
   readonly state$ = new BehaviorSubject<Record<string, any>>({});
 
+  // De-dup guards for snapshot-driven UI updates
+  private turnHasTextStream = false;
+  private lastSnapshotHash: string | null = null;
+
   private uuid(): string {
     try { return (crypto as any).randomUUID(); } catch { return `id-${Date.now()}-${Math.random().toString(16).slice(2)}`; }
   }
@@ -64,8 +68,11 @@ export class AguiService {
     switch (e.type) {
       case EventType.RUN_STARTED:
         if (e.thread_id) this.threadId$.next(e.thread_id);
+        this.turnHasTextStream = false;
+        this.lastSnapshotHash = null;
         break;
       case EventType.TEXT_MESSAGE_START: {
+        this.turnHasTextStream = true;
         this.appendMessage({ role: 'assistant', text: '' });
         break;
       }
@@ -80,24 +87,38 @@ export class AguiService {
       }
       case EventType.STATE_SNAPSHOT: {
         if (e.snapshot) this.state$.next(e.snapshot as any);
-        // Fallback: append last LC-style message (do not overwrite transcript)
+        // Fallback: append last LC-style message (skip if text stream already handled this turn)
+        if (this.turnHasTextStream) break;
         const msgs = (e.snapshot?.messages || []) as any[];
         if (Array.isArray(msgs) && msgs.length > 0) {
           const last = msgs[msgs.length - 1];
           const t = last?.type;
           const content = last?.content ?? '';
-          if (t === 'human') this.appendMessage({ role: 'user', text: content });
-          else if (t === 'ai') this.appendMessage({ role: 'assistant', text: content });
+          const role = t === 'human' ? 'user' : t === 'ai' ? 'assistant' : null as any;
+          if (role === 'user' || role === 'assistant') {
+            const hash = `${role}:${content}`;
+            if (this.lastSnapshotHash !== hash) {
+              this.appendMessage({ role, text: content });
+              this.lastSnapshotHash = hash;
+            }
+          }
         }
         break;
       }
       case EventType.MESSAGES_SNAPSHOT: {
         const msgs = (e.messages || []) as any[];
         if (Array.isArray(msgs)) {
+          if (this.turnHasTextStream) break;
           const last = msgs[msgs.length - 1];
           const role = last?.role;
           const text = last?.content ?? '';
-          if (role === 'user' || role === 'assistant') this.appendMessage({ role, text });
+          if (role === 'user' || role === 'assistant') {
+            const hash = `${role}:${text}`;
+            if (this.lastSnapshotHash !== hash) {
+              this.appendMessage({ role, text });
+              this.lastSnapshotHash = hash;
+            }
+          }
         }
         break;
       }
