@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 import os
 import logging
 
@@ -43,6 +43,7 @@ def build_form_agent_graph():
         form: Dict[str, Any]
         next_field_index: int
         asked_index: int
+        pending_user_text: Optional[str]
 
     def ensure_state_defaults(state: Dict[str, Any]) -> Dict[str, Any]:
         if "form" not in state:
@@ -51,6 +52,8 @@ def build_form_agent_graph():
             state["next_field_index"] = 0
         if "asked_index" not in state:
             state["asked_index"] = -1
+        if "pending_user_text" not in state:
+            state["pending_user_text"] = None
         return state
 
     async def ask_or_finish(state: Dict[str, Any]):
