@@ -132,7 +132,7 @@ def build_form_agent_graph():
         logger.debug("entry_cleanup: purge at run start")
         return {"messages": []}
 
-    graph = StateGraph(FormState)
+    graph = StateGraph(dict)
     graph.add_node("ask", ask_or_finish)
     graph.add_node("cleanup", cleanup_messages)
     graph.add_node("process", process_user)
