@@ -18,12 +18,15 @@ export class AguiService {
   // De-dup guards for snapshot-driven UI updates
   private turnHasTextStream = false;
   private lastSnapshotHash: string | null = null;
+  private started = false;
 
   private uuid(): string {
     try { return (crypto as any).randomUUID(); } catch { return `id-${Date.now()}-${Math.random().toString(16).slice(2)}`; }
   }
 
   start(threadId?: string) {
+    if (this.started) return;
+    this.started = true;
     const tid = threadId || this.threadId$.value || this.uuid();
     this.threadId$.next(tid);
     const runInput: any = {
@@ -44,6 +47,7 @@ export class AguiService {
     this.threadId$.next(tid);
     // Optimistically show user text to avoid visual clearing
     this.appendMessage({ role: 'user', text });
+    this.lastSnapshotHash = `user:${text}`;
     const runInput: any = {
       threadId: tid,
       runId: this.uuid(),
