@@ -6,7 +6,7 @@ import os
 from langgraph.graph import StateGraph, MessagesState
 from langgraph.checkpoint.memory import MemorySaver
 from langchain_openai import ChatOpenAI
-from langchain_core.messages import SystemMessage, HumanMessage
+from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 
 from app.config.settings import settings
 
@@ -52,16 +52,13 @@ def build_form_agent_graph():
             # All fields collected; summarize and end
             return {
                 "messages": [
-                    {
-                        "role": "assistant",
-                        "content": "Thank you. All required details have been collected."
-                    }
+                    AIMessage(content="Thank you. All required details have been collected.")
                 ]
             }
         field_key, prompt = FIELDS[state["next_field_index"]]
         return {
             "messages": [
-                {"role": "assistant", "content": prompt}
+                AIMessage(content=prompt)
             ]
         }
 
@@ -111,7 +108,7 @@ def build_form_agent_graph():
                     content = getattr(resp, "content", None) or str(resp)
                 except Exception:
                     pass
-            return {"messages": [{"role": "assistant", "content": content}]}
+            return {"messages": [AIMessage(content=content)]}
         return {}
 
     def router_node(state: Dict[str, Any]):
