@@ -39,7 +39,7 @@ export class AguiService {
       messages: [],
       tools: [],
       context: [],
-      forwardedProps: { node_name: "__end__", command: {} }
+      forwardedProps: { node_name: "sanitize", command: {} }
     };
     const events$ = (this.agent as any).run(runInput);
     (events$ as any).subscribe((e: any) => this.onEvent(e));
@@ -62,7 +62,7 @@ export class AguiService {
       messages: [{ id: this.uuid(), role: 'user', content: text }],
       tools: [],
       context: [],
-      forwardedProps: { node_name: "__end__", command: {} }
+      forwardedProps: { node_name: "sanitize", command: {} }
     };
     const events$ = (this.agent as any).run(runInput);
     (events$ as any).subscribe((e: any) => this.onEvent(e));
