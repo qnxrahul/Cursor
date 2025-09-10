@@ -15,22 +15,40 @@ export class AguiService {
   readonly messages$ = new BehaviorSubject<AguiMessage[]>([]);
   readonly state$ = new BehaviorSubject<Record<string, any>>({});
 
+  private uuid(): string {
+    try { return (crypto as any).randomUUID(); } catch { return `id-${Date.now()}-${Math.random().toString(16).slice(2)}`; }
+  }
+
   start(threadId?: string) {
-    const runInput: RunAgentInput = {
-      thread_id: threadId || undefined,
+    const tid = threadId || this.threadId$.value || this.uuid();
+    this.threadId$.next(tid);
+    const runInput: any = {
+      threadId: tid,
+      runId: this.uuid(),
+      state: {},
       messages: [],
-    } as any;
+      tools: [],
+      context: [],
+      forwardedProps: {}
+    };
     const events$ = (this.agent as any).run(runInput);
     (events$ as any).subscribe((e: any) => this.onEvent(e));
   }
 
   send(text: string) {
-    const runInput: RunAgentInput = {
-      thread_id: this.threadId$.value || undefined,
+    const tid = this.threadId$.value || this.uuid();
+    this.threadId$.next(tid);
+    const runInput: any = {
+      threadId: tid,
+      runId: this.uuid(),
+      state: {},
       messages: [
-        { role: 'user', content: text },
-      ] as any,
-    } as any;
+        { id: this.uuid(), role: 'user', content: text },
+      ],
+      tools: [],
+      context: [],
+      forwardedProps: {}
+    };
     const events$ = (this.agent as any).run(runInput);
     (events$ as any).subscribe((e: any) => this.onEvent(e));
   }
