@@ -104,7 +104,20 @@ export class AguiService {
         break;
       }
       case EventType.STATE_SNAPSHOT: {
-        if (e.snapshot) this.state$.next(e.snapshot as any);
+        // Merge rawEvent.output/input keys like form, next_field_index in addition to snapshot
+        const prev = (this.state$.value || {}) as any;
+        const next: any = { ...prev };
+        const raw = (e.rawEvent?.data?.output || e.rawEvent?.data?.input || {}) as any;
+        if (raw && typeof raw === 'object') {
+          if (raw.form) next.form = { ...(prev.form || {}), ...raw.form };
+          if (typeof raw.next_field_index === 'number') next.next_field_index = raw.next_field_index;
+          if (typeof raw.asked_index === 'number') next.asked_index = raw.asked_index;
+        }
+        if (e.snapshot && typeof e.snapshot === 'object') {
+          // e.snapshot often only includes messages/tools; keep merge minimal
+          if (Array.isArray((e.snapshot as any).messages)) next.messages = (e.snapshot as any).messages;
+        }
+        this.state$.next(next);
         // Fallback: append last LC-style message (skip if text stream already handled this turn)
         if (this.turnHasTextStream) break;
         const msgs = (e.snapshot?.messages || []) as any[];
