@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 import os
+import logging
 
 from langgraph.graph import StateGraph, MessagesState
 from langgraph.checkpoint.memory import MemorySaver
@@ -9,6 +10,8 @@ from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 
 from app.config.settings import settings
+
+logger = logging.getLogger(__name__)
 
 
 FIELDS = [
@@ -33,6 +36,7 @@ def build_form_agent_graph():
                 temperature=0.2,
             )
         except Exception:
+            logger.exception("LLM init failed; continuing without LLM acks")
             llm = None
 
     class FormState(MessagesState):
@@ -48,14 +52,17 @@ def build_form_agent_graph():
 
     async def ask_or_finish(state: Dict[str, Any]):
         state = ensure_state_defaults(state)
+        logger.debug("ask_or_finish: next_field_index=%s", state.get("next_field_index"))
         if state["next_field_index"] >= len(FIELDS):
             # All fields collected; summarize and end
+            logger.debug("ask_or_finish: finished")
             return {
                 "messages": [
                     AIMessage(content="Thank you. All required details have been collected.")
                 ]
             }
         field_key, prompt = FIELDS[state["next_field_index"]]
+        logger.debug("ask_or_finish: asking '%s'", field_key)
         return {
             "messages": [
                 AIMessage(content=prompt)
@@ -64,6 +71,7 @@ def build_form_agent_graph():
 
     async def cleanup_messages(state: Dict[str, Any]):
         # Ensure messages are not persisted in the checkpoint to avoid regenerate mode
+        logger.debug("cleanup_messages: purge before checkpoint")
         return {"messages": []}
 
     async def process_user(state: Dict[str, Any]):
@@ -74,6 +82,7 @@ def build_form_agent_graph():
 
         field_key, _ = FIELDS[idx]
         messages = list(state.get("messages", []))
+        logger.debug("process_user: idx=%s, field=%s, messages=%s", idx, field_key, len(messages))
         if not messages:
             return state
 
@@ -87,21 +96,26 @@ def build_form_agent_graph():
             last_role = "user" if msg_type == "human" else "assistant"
             content = getattr(last, "content", None)
 
+        logger.debug("process_user: last_role=%s content=%s", last_role, (content[:60] if isinstance(content, str) else str(content)))
         if last_role == "user" and content:
             state["form"][field_key] = content
             state["next_field_index"] = idx + 1
             # Clear messages so next node asks the next question cleanly
             # but keep state(form/next_field_index) intact
             state["messages"] = []
+            logger.debug("process_user: stored '%s', next=%s, cleared messages", field_key, state["next_field_index"])
         return state
 
 
     def router_node(state: Dict[str, Any]):
-        return ensure_state_defaults(state)
+        state = ensure_state_defaults(state)
+        logger.debug("router_node: next=%s, msgs=%s", state.get("next_field_index"), len(state.get("messages", [])))
+        return state
 
     def choose_next(state: Dict[str, Any]):
         messages = state.get("messages", [])
         if not messages:
+            logger.debug("choose_next: no messages -> ask")
             return "ask"
         last = messages[-1]
         if isinstance(last, dict):
@@ -109,7 +123,9 @@ def build_form_agent_graph():
         else:
             msg_type = getattr(last, "type", None) or last.__class__.__name__.lower()
             last_role = "user" if msg_type == "human" else "assistant"
-        return "process" if last_role == "user" else "ask"
+        decision = "process" if last_role == "user" else "ask"
+        logger.debug("choose_next: last_role=%s -> %s", last_role, decision)
+        return decision
 
     graph = StateGraph(FormState)
     graph.add_node("ask", ask_or_finish)
@@ -123,5 +139,7 @@ def build_form_agent_graph():
     graph.add_edge("ask", "cleanup")
 
     checkpointer = MemorySaver()
-    return graph.compile(checkpointer=checkpointer)
+    compiled = graph.compile(checkpointer=checkpointer)
+    logger.info("Compiled form agent with MemorySaver; nodes: router, process, ask, cleanup")
+    return compiled
 
