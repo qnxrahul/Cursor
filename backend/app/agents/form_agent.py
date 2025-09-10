@@ -127,16 +127,23 @@ def build_form_agent_graph():
         logger.debug("choose_next: last_role=%s -> %s", last_role, decision)
         return decision
 
-    graph = StateGraph(FormState)
+    async def entry_cleanup(state: Dict[str, Any]):
+        # purge any lingering messages right at run start
+        logger.debug("entry_cleanup: purge at run start")
+        return {"messages": []}
+
+    graph = StateGraph(dict)
     graph.add_node("ask", ask_or_finish)
     graph.add_node("cleanup", cleanup_messages)
     graph.add_node("process", process_user)
     graph.add_node("router", router_node)
-    graph.set_entry_point("router")
+    graph.add_node("entry", entry_cleanup)
+    graph.set_entry_point("entry")
 
     graph.add_conditional_edges("router", choose_next, {"ask": "ask", "process": "process"})
     graph.add_edge("process", "ask")
     graph.add_edge("ask", "cleanup")
+    graph.add_edge("entry", "router")
 
     checkpointer = MemorySaver()
     compiled = graph.compile(checkpointer=checkpointer)
