@@ -25,6 +25,7 @@ export class AguiService {
   private lastAssistantId: string | null = null;
   private lastUserText: string | null = null;
   private lastUserId: string | null = null;
+  private sawAssistantThisTurn = false;
 
   private uuid(): string {
     try { return (crypto as any).randomUUID(); } catch { return `id-${Date.now()}-${Math.random().toString(16).slice(2)}`; }
@@ -85,9 +86,11 @@ export class AguiService {
         if (e.thread_id) this.threadId$.next(e.thread_id);
         this.turnHasTextStream = false;
         this.lastSnapshotHash = null;
+        this.sawAssistantThisTurn = false;
         break;
       case EventType.TEXT_MESSAGE_START: {
         this.turnHasTextStream = true;
+        this.sawAssistantThisTurn = true;
         this.appendMessage({ role: 'assistant', text: '' });
         break;
       }
@@ -118,62 +121,18 @@ export class AguiService {
           if (Array.isArray((e.snapshot as any).messages)) next.messages = (e.snapshot as any).messages;
         }
         this.state$.next(next);
-        // Fallback: append last LC-style message (skip if text stream already handled this turn)
-        if (this.turnHasTextStream) break;
-        const msgs = (e.snapshot?.messages || []) as any[];
-        if (Array.isArray(msgs) && msgs.length > 0) {
-          const last = msgs[msgs.length - 1];
-          const t = last?.type;
-          const content = last?.content ?? '';
-          const role = t === 'human' ? 'user' : t === 'ai' ? 'assistant' : null as any;
-          if (role === 'user' || role === 'assistant') {
-            const norm = String(content || '').trim();
-            const hash = `${role}:${norm}`;
-            if (this.lastSnapshotHash !== hash) {
-              // Extra dedup: if last appended message matches exactly, skip
-              const current = this.messages$.value;
-              const lastMsg = current[current.length - 1];
-              if (!(lastMsg && lastMsg.role === role && lastMsg.text.trim() === norm)) {
-                this.appendMessage({ role, text: content });
-              }
-              this.lastSnapshotHash = hash;
-              if (role === 'assistant') {
-                this.lastAssistantText = content;
-                this.lastAssistantId = last?.id || null;
-              } else if (role === 'user') {
-                this.lastUserText = content;
-                this.lastUserId = last?.id || null;
-              }
-            }
-          }
-        }
         break;
       }
       case EventType.MESSAGES_SNAPSHOT: {
+        // Do not append messages from snapshots to avoid duplicates; only update assistant tracking
         const msgs = (e.messages || []) as any[];
-        if (Array.isArray(msgs)) {
-          if (this.turnHasTextStream) break;
+        if (Array.isArray(msgs) && msgs.length > 0) {
           const last = msgs[msgs.length - 1];
           const role = last?.role;
           const text = last?.content ?? '';
-          if (role === 'user' || role === 'assistant') {
-            const norm = String(text || '').trim();
-            const hash = `${role}:${norm}`;
-            if (this.lastSnapshotHash !== hash) {
-              const current = this.messages$.value;
-              const lastMsg = current[current.length - 1];
-              if (!(lastMsg && lastMsg.role === role && lastMsg.text.trim() === norm)) {
-                this.appendMessage({ role, text });
-              }
-              this.lastSnapshotHash = hash;
-              if (role === 'assistant') {
-                this.lastAssistantText = text;
-                this.lastAssistantId = last?.id || null;
-              } else if (role === 'user') {
-                this.lastUserText = text;
-                this.lastUserId = last?.id || null;
-              }
-            }
+          if (role === 'assistant') {
+            this.lastAssistantText = text;
+            this.lastAssistantId = last?.id || null;
           }
         }
         break;
