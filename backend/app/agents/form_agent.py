@@ -42,6 +42,7 @@ def build_form_agent_graph():
     class FormState(MessagesState):
         form: Dict[str, Any]
         next_field_index: int
+        asked_index: int
 
     def ensure_state_defaults(state: Dict[str, Any]) -> Dict[str, Any]:
         if "form" not in state:
@@ -153,7 +154,7 @@ def build_form_agent_graph():
         logger.debug("sanitize_incoming: incoming=%s kept=%s", len(msgs), len(new_msgs))
         return {"messages": new_msgs}
 
-    graph = StateGraph(dict)
+    graph = StateGraph(FormState)
     graph.add_node("ask", ask_or_finish)
     graph.add_node("cleanup", cleanup_messages)
     graph.add_node("process", process_user)
