@@ -21,6 +21,7 @@ export class AguiService {
   private started = false;
   private lastSentHash: string | null = null;
   private lastSentAt = 0;
+  private lastAssistantText: string | null = null;
 
   private uuid(): string {
     try { return (crypto as any).randomUUID(); } catch { return `id-${Date.now()}-${Math.random().toString(16).slice(2)}`; }
@@ -54,11 +55,16 @@ export class AguiService {
     this.lastSentHash = hash;
     this.lastSentAt = now;
     // Do NOT optimistically render here; wait for server echoes to avoid dupes
+    const shadowAssistant = this.lastAssistantText
+      ? [{ id: this.uuid(), role: 'assistant', content: this.lastAssistantText }]
+      : [];
+
     const runInput: any = {
       threadId: tid,
       runId: this.uuid(),
       state: {},
       messages: [
+        ...shadowAssistant,
         { id: this.uuid(), role: 'user', content: text },
       ],
       tools: [],
@@ -90,7 +96,10 @@ export class AguiService {
         const msgs = this.messages$.value.slice();
         if (msgs.length > 0) {
           const last = msgs[msgs.length - 1];
-          if (last.role === 'assistant') last.text += e.delta || '';
+          if (last.role === 'assistant') {
+            last.text += e.delta || '';
+            this.lastAssistantText = last.text || null;
+          }
           this.messages$.next(msgs);
         }
         break;
@@ -110,6 +119,7 @@ export class AguiService {
             if (this.lastSnapshotHash !== hash) {
               this.appendMessage({ role, text: content });
               this.lastSnapshotHash = hash;
+              if (role === 'assistant') this.lastAssistantText = content;
             }
           }
         }
@@ -127,6 +137,7 @@ export class AguiService {
             if (this.lastSnapshotHash !== hash) {
               this.appendMessage({ role, text });
               this.lastSnapshotHash = hash;
+              if (role === 'assistant') this.lastAssistantText = text;
             }
           }
         }
