@@ -23,6 +23,8 @@ export class AguiService {
   private lastSentAt = 0;
   private lastAssistantText: string | null = null;
   private lastAssistantId: string | null = null;
+  private lastUserText: string | null = null;
+  private lastUserId: string | null = null;
 
   private uuid(): string {
     try { return (crypto as any).randomUUID(); } catch { return `id-${Date.now()}-${Math.random().toString(16).slice(2)}`; }
@@ -114,13 +116,22 @@ export class AguiService {
           const content = last?.content ?? '';
           const role = t === 'human' ? 'user' : t === 'ai' ? 'assistant' : null as any;
           if (role === 'user' || role === 'assistant') {
-            const hash = `${role}:${content}`;
+            const norm = String(content || '').trim();
+            const hash = `${role}:${norm}`;
             if (this.lastSnapshotHash !== hash) {
-              this.appendMessage({ role, text: content });
+              // Extra dedup: if last appended message matches exactly, skip
+              const current = this.messages$.value;
+              const lastMsg = current[current.length - 1];
+              if (!(lastMsg && lastMsg.role === role && lastMsg.text.trim() === norm)) {
+                this.appendMessage({ role, text: content });
+              }
               this.lastSnapshotHash = hash;
               if (role === 'assistant') {
                 this.lastAssistantText = content;
                 this.lastAssistantId = last?.id || null;
+              } else if (role === 'user') {
+                this.lastUserText = content;
+                this.lastUserId = last?.id || null;
               }
             }
           }
@@ -135,13 +146,21 @@ export class AguiService {
           const role = last?.role;
           const text = last?.content ?? '';
           if (role === 'user' || role === 'assistant') {
-            const hash = `${role}:${text}`;
+            const norm = String(text || '').trim();
+            const hash = `${role}:${norm}`;
             if (this.lastSnapshotHash !== hash) {
-              this.appendMessage({ role, text });
+              const current = this.messages$.value;
+              const lastMsg = current[current.length - 1];
+              if (!(lastMsg && lastMsg.role === role && lastMsg.text.trim() === norm)) {
+                this.appendMessage({ role, text });
+              }
               this.lastSnapshotHash = hash;
               if (role === 'assistant') {
                 this.lastAssistantText = text;
                 this.lastAssistantId = last?.id || null;
+              } else if (role === 'user') {
+                this.lastUserText = text;
+                this.lastUserId = last?.id || null;
               }
             }
           }
