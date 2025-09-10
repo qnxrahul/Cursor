@@ -121,8 +121,8 @@ export class AguiService {
           if (Array.isArray((e.snapshot as any).messages)) next.messages = (e.snapshot as any).messages;
         }
         this.state$.next(next);
-        // Fallback to render assistant message if there was no streaming this turn
-        if (!this.turnHasTextStream) {
+        // Fallback to render assistant message if none streamed yet this turn
+        if (!this.sawAssistantThisTurn) {
           const msgs = (e.snapshot?.messages || []) as any[];
           if (Array.isArray(msgs) && msgs.length > 0) {
             const last = msgs[msgs.length - 1];
@@ -141,6 +141,7 @@ export class AguiService {
                 this.lastSnapshotHash = hash;
                 this.lastAssistantText = content;
                 this.lastAssistantId = last?.id || null;
+                this.sawAssistantThisTurn = true;
               }
             }
           }
@@ -149,7 +150,7 @@ export class AguiService {
       }
       case EventType.MESSAGES_SNAPSHOT: {
         const msgs = (e.messages || []) as any[];
-        if (Array.isArray(msgs) && !this.turnHasTextStream && msgs.length > 0) {
+        if (Array.isArray(msgs) && !this.sawAssistantThisTurn && msgs.length > 0) {
           const last = msgs[msgs.length - 1];
           const role = last?.role;
           const text = last?.content ?? '';
@@ -165,6 +166,7 @@ export class AguiService {
               this.lastSnapshotHash = hash;
               this.lastAssistantText = text;
               this.lastAssistantId = last?.id || null;
+              this.sawAssistantThisTurn = true;
             }
           }
         } else if (Array.isArray(msgs) && msgs.length > 0) {
