@@ -85,7 +85,7 @@ export class AguiService {
       case EventType.RUN_STARTED:
         if (e.thread_id) this.threadId$.next(e.thread_id);
         this.turnHasTextStream = false;
-        this.lastSnapshotHash = null;
+        // Do not reset lastSnapshotHash here; keep across runs to avoid re-appending identical prompts
         this.sawAssistantThisTurn = false;
         break;
       case EventType.TEXT_MESSAGE_START: {
