@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional
 import os
 import logging
+import re
 
 from langgraph.graph import StateGraph, MessagesState
 from langgraph.checkpoint.memory import MemorySaver
@@ -110,7 +111,80 @@ def build_form_agent_graph():
                         content = getattr(last, "content", None)
         if not content:
             return state
-        state["form"][field_key] = content
+
+        def normalize_field_value(key: str, value: str) -> str:
+            text = (value or "").strip()
+            # Common prefix removal patterns
+            PREFIXES = [
+                r"^my name is\s+",
+                r"^i am\s+",
+                r"^i\'m\s+",
+                r"^this is\s+",
+                r"^it\'s\s+",
+                r"^name\s*[:\-]\s*",
+                r"^email\s*[:\-]\s*",
+                r"^the issue is\s+",
+                r"^issue is\s+",
+                r"^problem is\s+",
+                r"^it is\s+",
+            ]
+            def strip_prefixes(s: str) -> str:
+                s2 = s.strip()
+                for pat in PREFIXES:
+                    s2 = re.sub(pat, "", s2, flags=re.IGNORECASE)
+                return s2.strip()
+
+            if key == "name":
+                s = strip_prefixes(text)
+                # Remove trailing punctuation
+                s = re.sub(r"[\.,!]+$", "", s).strip()
+                # Title case but preserve internal apostrophes/hyphens
+                parts = [p for p in re.split(r"\s+", s) if p]
+                s = " ".join([p[:1].upper() + p[1:] if p else p for p in parts])
+                return s
+
+            if key == "email":
+                m = re.search(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", text)
+                return m.group(0).lower() if m else text
+
+            if key == "issue_details":
+                s = strip_prefixes(text)
+                return s
+
+            if key == "type":
+                lower = text.lower()
+                if "incident" in lower:
+                    return "incident"
+                if "service" in lower:
+                    return "service"
+                if "access" in lower:
+                    return "access"
+                # Fallback: first word
+                return re.split(r"\s+", lower)[0]
+
+            if key == "urgency":
+                lower = text.lower()
+                if any(w in lower for w in ["critical", "severe"]):
+                    return "critical"
+                if any(w in lower for w in ["high", "urgent"]):
+                    return "high"
+                if "medium" in lower:
+                    return "medium"
+                if "low" in lower:
+                    return "low"
+                return lower.strip()
+
+            if key == "location":
+                lower = text.lower()
+                for token in ["office", "site", "remote"]:
+                    if token in lower:
+                        return token
+                return lower.strip()
+
+            return text
+
+        normalized = normalize_field_value(field_key, str(content))
+        state["form"][field_key] = normalized
         state["next_field_index"] = idx + 1
         # Clear transient inputs and messages so checkpoints never hold messages
         state["pending_user_text"] = None
