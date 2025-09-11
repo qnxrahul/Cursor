@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Optional
 import os
 import logging
 import re
+import json
 
 from langgraph.graph import StateGraph, MessagesState
 from langgraph.checkpoint.memory import MemorySaver
@@ -75,7 +76,11 @@ def build_form_agent_graph():
             idx = int(state["pending_field_index"])
             field_key, _ = FIELDS[idx]
             pending_val = state.get("pending_value") or ""
-            confirm_text = f"Please confirm {field_key.replace('_',' ')}: '{pending_val}'. Reply yes/no or provide a correction."
+            # More helpful, natural confirmation prompt
+            confirm_text = (
+                f"I understood your {field_key.replace('_',' ')} as: '{pending_val}'.\n"
+                "- Reply 'yes' to confirm\n- Reply 'no' to re-enter\n- Or type the correct value."
+            )
             return {"messages": [AIMessage(content=confirm_text)]}
         if state["next_field_index"] >= len(FIELDS):
             # All fields collected; summarize and end
@@ -161,11 +166,39 @@ def build_form_agent_graph():
                 return lower.strip()
             if key == "location":
                 lower = text.lower()
-                for token in ["office", "site", "remote"]:
-                    if token in lower:
-                        return token
+                # Expand synonyms for location
+                office_syn = {"office", "hq", "headquarters"}
+                site_syn = {"site", "onsite", "on site"}
+                remote_syn = {"remote", "home", "wfh", "work from home"}
+                if any(tok in lower for tok in office_syn):
+                    return "office"
+                if any(tok in lower for tok in site_syn):
+                    return "site"
+                if any(tok in lower for tok in remote_syn):
+                    return "remote"
                 return lower.strip()
             return text
+
+        # Optional: LLM-assisted extraction for smarter suggestions
+        def llm_extract_field_suggestion(field: str, raw_text: str) -> Optional[str]:
+            if llm is None:
+                return None
+            try:
+                prompt = (
+                    "Extract the user's " + field.replace('_',' ') +
+                    " from the following message.\n" \
+                    "- Return only the value, no extra words.\n" \
+                    "- For email, return a valid email.\n" \
+                    "- For location, choose one of: office, site, remote.\n\n" \
+                    f"Message: {raw_text}"
+                )
+                resp = llm.invoke(prompt)  # type: ignore
+                val = getattr(resp, "content", None)
+                if isinstance(val, str):
+                    return val.strip()
+            except Exception:
+                logger.exception("LLM extract failed for field=%s", field)
+            return None
 
         # If awaiting confirmation, interpret yes/no/correction
         if state.get("awaiting_confirmation") and state.get("pending_field_index") is not None:
@@ -226,7 +259,9 @@ def build_form_agent_graph():
         if not content:
             return state
 
-        normalized = normalize_field_value(field_key, str(content))
+        # Try LLM suggestion first, then heuristic normalization
+        suggestion = llm_extract_field_suggestion(field_key, str(content))
+        normalized = normalize_field_value(field_key, suggestion or str(content))
         state["awaiting_confirmation"] = True
         state["pending_field_index"] = idx
         state["pending_value"] = normalized
