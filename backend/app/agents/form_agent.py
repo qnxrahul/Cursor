@@ -74,6 +74,8 @@ def build_form_agent_graph():
         form_type: Optional[str]
         schema_confirmed: bool
         theme: Optional[Dict[str, Any]]
+        schema_build_mode: bool
+        proposed_form_type: Optional[str]
 
     def ensure_state_defaults(state: Dict[str, Any]) -> Dict[str, Any]:
         if "form" not in state:
@@ -98,6 +100,10 @@ def build_form_agent_graph():
             state["schema_confirmed"] = False
         if "theme" not in state:
             state["theme"] = None
+        if "schema_build_mode" not in state:
+            state["schema_build_mode"] = False
+        if "proposed_form_type" not in state:
+            state["proposed_form_type"] = None
         return state
 
     async def ask_or_finish(state: Dict[str, Any]):
@@ -105,10 +111,21 @@ def build_form_agent_graph():
         logger.debug("ask_or_finish: next_field_index=%s asked_index=%s awaiting=%s", state.get("next_field_index"), state.get("asked_index"), state.get("awaiting_confirmation"))
 
         # If schema not chosen yet, ask which form type user needs
-        if not state.get("schema"):
+        if not state.get("schema") and not state.get("schema_build_mode"):
             choices = ", ".join(sorted(forms_manifest.keys())) if forms_manifest else "service_auth"
             msg = f"Which form would you like to fill? (choices: {choices})"
             return {"messages": [AIMessage(content=msg)]}
+
+        # If building a custom schema, ask user to provide fields specification
+        if state.get("schema_build_mode") and not state.get("schema"):
+            hint = (
+                "We don't have a manifest for that form. Please list fields as 'key:type:required(options)', "
+                "comma-separated.\n"
+                "- Types: text, email, number, date, textarea, select, radio, checkbox\n"
+                "- Example: name:text:required, email:email:required, status:select:required(pending,approved)\n"
+                "Optionally set submit label like: submit_label:Send"
+            )
+            return {"messages": [AIMessage(content=hint)]}
 
         # If schema chosen but not confirmed, present fields and ask for changes
         if not state.get("schema_confirmed"):
@@ -298,7 +315,7 @@ def build_form_agent_graph():
             return state
 
         # Handle form type selection if schema not set
-        if not state.get("schema"):
+        if not state.get("schema") and not state.get("schema_build_mode"):
             choice = (state.get("pending_user_text") or "").strip().lower()
             state["pending_user_text"] = None
             state["messages"] = []
@@ -313,12 +330,67 @@ def build_form_agent_graph():
                         selected_key = k
                         break
             if not selected_key:
-                return state  # ask_or_finish will ask again
+                # Enter custom schema build mode
+                state["schema_build_mode"] = True
+                state["proposed_form_type"] = (choice or "custom").strip() or "custom"
+                return state
             state["schema"] = forms_manifest[selected_key]
             state["form_type"] = selected_key
             state["next_field_index"] = 0
             logger.debug("Selected schema '%s' with %s fields", selected_key, len(state["schema"].get("fields", [])))
             return state
+
+        # Parse custom schema fields provided by user
+        if state.get("schema_build_mode") and not state.get("schema") and state.get("pending_user_text"):
+            spec_text = str(state.get("pending_user_text") or "")
+            state["pending_user_text"] = None
+            state["messages"] = []
+            fields: List[Dict[str, Any]] = []
+            submit_label: Optional[str] = None
+            try:
+                # split by commas not inside parentheses
+                parts = re.split(r",(?=(?:[^()]*\([^()]*\))*[^()]*$)", spec_text)
+                for p in parts:
+                    s = p.strip()
+                    if not s:
+                        continue
+                    # submit label
+                    if s.lower().startswith("submit_label:"):
+                        submit_label = s.split(":", 1)[1].strip()
+                        continue
+                    # pattern: key:type:required(options)
+                    m = re.match(r"^([a-zA-Z0-9_\-]+)\s*:\s*([a-zA-Z]+)(?::\s*(required))?(?:\(([^)]*)\))?$", s)
+                    if not m:
+                        # allow key only -> default text
+                        key_only = s
+                        label = " ".join(key_only.replace("_", " ").replace("-", " ").split()).title()
+                        fields.append({"key": key_only, "label": label, "type": "text", "required": False})
+                        continue
+                    key, ftype, reqflag, opts = m.groups()
+                    ftype = ftype.lower()
+                    required = (reqflag is not None)
+                    label = " ".join(key.replace("_", " ").replace("-", " ").split()).title()
+                    field: Dict[str, Any] = {"key": key, "label": label, "type": ftype, "required": required}
+                    if opts:
+                        options = [o.strip() for o in opts.split(";") for o in o.split(",") if o.strip()]
+                        if options:
+                            field["options"] = options
+                    # checkboxes default to array
+                    fields.append(field)
+                if not fields:
+                    return state
+                schema = {"title": state.get("proposed_form_type") or "custom", "fields": fields}
+                if submit_label:
+                    schema["submit_label"] = submit_label
+                state["schema"] = schema
+                state["form_type"] = (state.get("proposed_form_type") or "custom").replace(" ", "_")
+                state["schema_build_mode"] = False
+                state["next_field_index"] = 0
+                logger.debug("Built custom schema with %s fields", len(fields))
+                return state
+            except Exception:
+                logger.exception("Failed parsing custom schema spec")
+                return state
 
         # If schema not confirmed, parse confirmation or change commands
         if not state.get("schema_confirmed"):
