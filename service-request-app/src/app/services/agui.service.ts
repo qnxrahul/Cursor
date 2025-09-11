@@ -89,25 +89,12 @@ export class AguiService {
         this.sawAssistantThisTurn = false;
         break;
       case EventType.TEXT_MESSAGE_START: {
+        // Prefer snapshot-based rendering to avoid duplicates; do not append here
         this.turnHasTextStream = true;
-        const msgs = this.messages$.value;
-        const last = msgs[msgs.length - 1];
-        if (!(last && last.role === 'assistant')) {
-          this.appendMessage({ role: 'assistant', text: '' });
-        }
-        this.sawAssistantThisTurn = true;
         break;
       }
       case EventType.TEXT_MESSAGE_CONTENT: {
-        const msgs = this.messages$.value.slice();
-        if (msgs.length > 0) {
-          const last = msgs[msgs.length - 1];
-          if (last.role === 'assistant') {
-            last.text += e.delta || '';
-            this.lastAssistantText = last.text || null;
-          }
-          this.messages$.next(msgs);
-        }
+        // Skip streaming deltas; snapshots will render the final assistant text once
         break;
       }
       case EventType.STATE_SNAPSHOT: {
