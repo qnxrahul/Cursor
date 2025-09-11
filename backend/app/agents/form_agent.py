@@ -393,11 +393,16 @@ def build_form_agent_graph():
                     t = re.sub(r"\btext\s*field\b", "", t, flags=re.IGNORECASE)
                     t = re.sub(r"\bdate\b", "", t, flags=re.IGNORECASE)
                     t = re.sub(r"\bdropdown\b", "", t, flags=re.IGNORECASE)
+                    t = re.sub(r"\boptional\b", "", t, flags=re.IGNORECASE)
                     t = re.sub(r"\s+", " ", t).strip()
                     return " ".join([w.capitalize() for w in t.split(" ") if w]) or "Field"
 
                 nat_fields: List[Dict[str, Any]] = []
                 desc = spec_text
+                # Extract submit label globally (supports 'Submit label should be Send.')
+                msub_global = re.search(r"submit\s*label\s*(?:should\s*be|is|:)?\s*([^\.,;\n]+)", desc, flags=re.IGNORECASE)
+                if msub_global:
+                    submit_label = msub_global.group(1).strip().strip("'\"` ").title()
                 # split description into chunks by ',', ' and '
                 raw_chunks = re.split(r"\s*(?:,|\band\b)\s+", desc, flags=re.IGNORECASE)
                 for chunk in raw_chunks:
@@ -405,10 +410,8 @@ def build_form_agent_graph():
                     if not s:
                         continue
                     low = s.lower()
-                    # detect submit label
-                    msub = re.search(r"submit\s*label\s*should\s*be\s*([\w\- ]+)$", low)
-                    if msub:
-                        submit_label = msub.group(1).strip().title()
+                    # skip submit label chunks (handled globally)
+                    if "submit label" in low:
                         continue
                     # infer type
                     ftype = "text"
