@@ -45,6 +45,9 @@ def build_form_agent_graph():
         next_field_index: int
         asked_index: int
         pending_user_text: Optional[str]
+        awaiting_confirmation: bool
+        pending_field_index: Optional[int]
+        pending_value: Optional[str]
 
     def ensure_state_defaults(state: Dict[str, Any]) -> Dict[str, Any]:
         if "form" not in state:
@@ -55,11 +58,25 @@ def build_form_agent_graph():
             state["asked_index"] = -1
         if "pending_user_text" not in state:
             state["pending_user_text"] = None
+        if "awaiting_confirmation" not in state:
+            state["awaiting_confirmation"] = False
+        if "pending_field_index" not in state:
+            state["pending_field_index"] = None
+        if "pending_value" not in state:
+            state["pending_value"] = None
         return state
 
     async def ask_or_finish(state: Dict[str, Any]):
         state = ensure_state_defaults(state)
-        logger.debug("ask_or_finish: next_field_index=%s asked_index=%s", state.get("next_field_index"), state.get("asked_index"))
+        logger.debug("ask_or_finish: next_field_index=%s asked_index=%s awaiting=%s", state.get("next_field_index"), state.get("asked_index"), state.get("awaiting_confirmation"))
+
+        # If awaiting confirmation, ask to confirm the pending value
+        if state.get("awaiting_confirmation") and state.get("pending_field_index") is not None:
+            idx = int(state["pending_field_index"])
+            field_key, _ = FIELDS[idx]
+            pending_val = state.get("pending_value") or ""
+            confirm_text = f"Please confirm {field_key.replace('_',' ')}: '{pending_val}'. Reply yes/no or provide a correction."
+            return {"messages": [AIMessage(content=confirm_text)]}
         if state["next_field_index"] >= len(FIELDS):
             # All fields collected; summarize and end
             logger.debug("ask_or_finish: finished")
@@ -90,6 +107,103 @@ def build_form_agent_graph():
         if idx >= len(FIELDS):
             return state
 
+        # Helper: normalization (same as below)
+        def normalize_field_value(key: str, value: str) -> str:
+            text = (value or "").strip()
+            PREFIXES = [
+                r"^my name is\s+",
+                r"^i am\s+",
+                r"^i\'m\s+",
+                r"^this is\s+",
+                r"^it\'s\s+",
+                r"^name\s*[:\-]\s*",
+                r"^email\s*[:\-]\s*",
+                r"^the issue is\s+",
+                r"^issue is\s+",
+                r"^problem is\s+",
+                r"^it is\s+",
+            ]
+            def strip_prefixes(s: str) -> str:
+                s2 = s.strip()
+                for pat in PREFIXES:
+                    s2 = re.sub(pat, "", s2, flags=re.IGNORECASE)
+                return s2.strip()
+            if key == "name":
+                s = strip_prefixes(text)
+                s = re.sub(r"[\.,!]+$", "", s).strip()
+                parts = [p for p in re.split(r"\s+", s) if p]
+                s = " ".join([p[:1].upper() + p[1:] if p else p for p in parts])
+                return s
+            if key == "email":
+                m = re.search(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", text)
+                return m.group(0).lower() if m else text
+            if key == "issue_details":
+                return strip_prefixes(text)
+            if key == "type":
+                lower = text.lower()
+                if "incident" in lower:
+                    return "incident"
+                if "service" in lower:
+                    return "service"
+                if "access" in lower:
+                    return "access"
+                return re.split(r"\s+", lower)[0]
+            if key == "urgency":
+                lower = text.lower()
+                if any(w in lower for w in ["critical", "severe"]):
+                    return "critical"
+                if any(w in lower for w in ["high", "urgent"]):
+                    return "high"
+                if "medium" in lower:
+                    return "medium"
+                if "low" in lower:
+                    return "low"
+                return lower.strip()
+            if key == "location":
+                lower = text.lower()
+                for token in ["office", "site", "remote"]:
+                    if token in lower:
+                        return token
+                return lower.strip()
+            return text
+
+        # If awaiting confirmation, interpret yes/no/correction
+        if state.get("awaiting_confirmation") and state.get("pending_field_index") is not None:
+            user_txt = state.get("pending_user_text")
+            state["pending_user_text"] = None
+            state["messages"] = []
+            if user_txt is None:
+                return state
+            txt = str(user_txt).strip()
+            lower = txt.lower()
+            yes = any(w in lower for w in ["yes", "y", "correct", "confirm", "ok", "okay"])
+            no = any(w in lower for w in ["no", "n", "incorrect", "wrong"])
+            pending_idx = int(state["pending_field_index"])
+            field_key, _ = FIELDS[pending_idx]
+            if yes:
+                # Commit
+                commit_val = state.get("pending_value") or ""
+                state["form"][field_key] = commit_val
+                state["next_field_index"] = pending_idx + 1
+                state["awaiting_confirmation"] = False
+                state["pending_field_index"] = None
+                state["pending_value"] = None
+                logger.debug("confirm: committed %s='%s' -> next %s", field_key, commit_val, state["next_field_index"])
+                return state
+            if no:
+                # Reject; clear and re-ask same field
+                state["awaiting_confirmation"] = False
+                state["pending_field_index"] = None
+                state["pending_value"] = None
+                logger.debug("confirm: rejected suggestion for %s; will re-ask", field_key)
+                return state
+            # Treat as correction
+            corrected = normalize_field_value(field_key, txt)
+            state["pending_value"] = corrected
+            logger.debug("confirm: updated pending %s to '%s' (awaiting)", field_key, corrected)
+            return state
+
+        # Not awaiting: capture input and propose suggestion
         field_key, _ = FIELDS[idx]
         # Prefer transient pending_user_text if present; otherwise fall back to last human message
         pending = state.get("pending_user_text")
@@ -112,84 +226,14 @@ def build_form_agent_graph():
         if not content:
             return state
 
-        def normalize_field_value(key: str, value: str) -> str:
-            text = (value or "").strip()
-            # Common prefix removal patterns
-            PREFIXES = [
-                r"^my name is\s+",
-                r"^i am\s+",
-                r"^i\'m\s+",
-                r"^this is\s+",
-                r"^it\'s\s+",
-                r"^name\s*[:\-]\s*",
-                r"^email\s*[:\-]\s*",
-                r"^the issue is\s+",
-                r"^issue is\s+",
-                r"^problem is\s+",
-                r"^it is\s+",
-            ]
-            def strip_prefixes(s: str) -> str:
-                s2 = s.strip()
-                for pat in PREFIXES:
-                    s2 = re.sub(pat, "", s2, flags=re.IGNORECASE)
-                return s2.strip()
-
-            if key == "name":
-                s = strip_prefixes(text)
-                # Remove trailing punctuation
-                s = re.sub(r"[\.,!]+$", "", s).strip()
-                # Title case but preserve internal apostrophes/hyphens
-                parts = [p for p in re.split(r"\s+", s) if p]
-                s = " ".join([p[:1].upper() + p[1:] if p else p for p in parts])
-                return s
-
-            if key == "email":
-                m = re.search(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", text)
-                return m.group(0).lower() if m else text
-
-            if key == "issue_details":
-                s = strip_prefixes(text)
-                return s
-
-            if key == "type":
-                lower = text.lower()
-                if "incident" in lower:
-                    return "incident"
-                if "service" in lower:
-                    return "service"
-                if "access" in lower:
-                    return "access"
-                # Fallback: first word
-                return re.split(r"\s+", lower)[0]
-
-            if key == "urgency":
-                lower = text.lower()
-                if any(w in lower for w in ["critical", "severe"]):
-                    return "critical"
-                if any(w in lower for w in ["high", "urgent"]):
-                    return "high"
-                if "medium" in lower:
-                    return "medium"
-                if "low" in lower:
-                    return "low"
-                return lower.strip()
-
-            if key == "location":
-                lower = text.lower()
-                for token in ["office", "site", "remote"]:
-                    if token in lower:
-                        return token
-                return lower.strip()
-
-            return text
-
         normalized = normalize_field_value(field_key, str(content))
-        state["form"][field_key] = normalized
-        state["next_field_index"] = idx + 1
+        state["awaiting_confirmation"] = True
+        state["pending_field_index"] = idx
+        state["pending_value"] = normalized
         # Clear transient inputs and messages so checkpoints never hold messages
         state["pending_user_text"] = None
         state["messages"] = []
-        logger.debug("process_user: stored '%s', next=%s, cleared messages", field_key, state["next_field_index"])
+        logger.debug("process_user: suggested %s='%s', awaiting confirmation", field_key, normalized)
         return state
 
 
