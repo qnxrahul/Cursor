@@ -36,8 +36,7 @@ export class ServiceRequestFormComponent implements OnDestroy {
     });
     this.subs.push(s);
 
-    // Ensure session started so first question is asked
-    this.agui.start();
+    // Do not start the session here; chat component is responsible for starting once
   }
 
   onUserReply(input: string): void {
