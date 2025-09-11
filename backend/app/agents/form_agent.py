@@ -358,7 +358,8 @@ def build_form_agent_graph():
                     key = segs[0]
                     ftype = (segs[1] if len(segs) > 1 else "text").lower()
                     req = (segs[2].lower() == "required") if len(segs) > 2 else False
-                    new_f = {"key": key, "label": key.replace("_"," ").replace("-"," ").replace("  "," ").trim().title(), "type": ftype, "required": req}
+                    label = " ".join(key.replace("_", " ").replace("-", " ").split()).title()
+                    new_f = {"key": key, "label": label, "type": ftype, "required": req}
                     state["schema"]["fields"].append(new_f)  # type: ignore
                     logger.debug("Added field: %s", new_f)
                 except Exception:
