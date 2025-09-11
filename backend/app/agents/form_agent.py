@@ -380,6 +380,94 @@ def build_form_agent_graph():
                     logger.debug("Built custom schema via LLM with %s fields", len(inferred.get("fields", [])))
                     return state
 
+                # Heuristic natural-language parser
+                def snake_key(label: str) -> str:
+                    return re.sub(r"[^a-z0-9_]+", "_", label.strip().lower().replace(" ", "_")).strip("_")
+
+                def clean_label(text: str) -> str:
+                    # Remove phrases like 'as a select with ...', 'radio yes/no', 'text area', 'date'
+                    t = re.sub(r"\bas a\b.*$", "", text, flags=re.IGNORECASE)
+                    t = re.sub(r"\bwith\b.*$", "", t, flags=re.IGNORECASE)
+                    t = re.sub(r"\bradio\b.*$", "", t, flags=re.IGNORECASE)
+                    t = re.sub(r"\btext\s*area\b", "", t, flags=re.IGNORECASE)
+                    t = re.sub(r"\btext\s*field\b", "", t, flags=re.IGNORECASE)
+                    t = re.sub(r"\bdate\b", "", t, flags=re.IGNORECASE)
+                    t = re.sub(r"\bdropdown\b", "", t, flags=re.IGNORECASE)
+                    t = re.sub(r"\s+", " ", t).strip()
+                    return " ".join([w.capitalize() for w in t.split(" ") if w]) or "Field"
+
+                nat_fields: List[Dict[str, Any]] = []
+                desc = spec_text
+                # split description into chunks by ',', ' and '
+                raw_chunks = re.split(r"\s*(?:,|\band\b)\s+", desc, flags=re.IGNORECASE)
+                for chunk in raw_chunks:
+                    s = chunk.strip()
+                    if not s:
+                        continue
+                    low = s.lower()
+                    # detect submit label
+                    msub = re.search(r"submit\s*label\s*should\s*be\s*([\w\- ]+)$", low)
+                    if msub:
+                        submit_label = msub.group(1).strip().title()
+                        continue
+                    # infer type
+                    ftype = "text"
+                    options: List[str] = []
+                    required = ("required" in low) or ("must" in low and "optional" not in low)
+                    if re.search(r"\bemail\b", low):
+                        ftype = "email"
+                    elif re.search(r"\bnumber\b|amount|total|quantity", low):
+                        ftype = "number"
+                    elif re.search(r"\bdate\b|last working day|fiscal year", low):
+                        # if fiscal year dropdown later, we may override options
+                        ftype = "date"
+                    elif re.search(r"\btext\s*area\b|comments|description", low):
+                        ftype = "textarea"
+                    elif re.search(r"\bselect\b|\bdropdown\b", low):
+                        ftype = "select"
+                    elif re.search(r"\bradio\b", low):
+                        ftype = "radio"
+                    elif re.search(r"\bcheckbox\b|check\s*boxes", low):
+                        ftype = "checkbox"
+
+                    # parse options
+                    if ftype in ("select", "radio", "checkbox"):
+                        # look for 'with pending/approved' or 'yes/no'
+                        mopts = re.search(r"with\s+([\w\-\s/]+)", low)
+                        if mopts:
+                            raw = mopts.group(1)
+                            for token in re.split(r"/|,|\bor\b", raw):
+                                t = token.strip()
+                                if t:
+                                    options.append(t)
+                        if re.search(r"yes\s*/\s*no|yes\s*no", low):
+                            options = ["yes", "no"]
+                        if re.search(r"fiscal year", low) and not options:
+                            # generate recent fiscal years as options
+                            from datetime import datetime
+                            y = datetime.utcnow().year
+                            options = [f"FY{y-1}-{y}", f"FY{y}-{y+1}", f"FY{y+1}-{y+2}"]
+
+                    # derive label and key
+                    label = clean_label(s)
+                    key = snake_key(label)
+                    field: Dict[str, Any] = {"key": key, "label": label, "type": ftype, "required": required}
+                    if options:
+                        field["options"] = options
+                    nat_fields.append(field)
+
+                # If we recognized natural fields, use them
+                if nat_fields:
+                    schema = {"title": state.get("proposed_form_type") or "custom", "fields": nat_fields}
+                    if submit_label:
+                        schema["submit_label"] = submit_label
+                    state["schema"] = schema
+                    state["form_type"] = (state.get("proposed_form_type") or "custom").replace(" ", "_")
+                    state["schema_build_mode"] = False
+                    state["next_field_index"] = 0
+                    logger.debug("Built custom schema via heuristics with %s fields", len(nat_fields))
+                    return state
+
                 # Fallback: split by commas not inside parentheses and parse key:type:required(options)
                 parts = re.split(r",(?=(?:[^()]*\([^()]*\))*[^()]*$)", spec_text)
                 for p in parts:
