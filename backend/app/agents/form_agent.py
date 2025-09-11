@@ -5,6 +5,7 @@ import os
 import logging
 import re
 import json
+from pathlib import Path
 
 from langgraph.graph import StateGraph, MessagesState
 from langgraph.checkpoint.memory import MemorySaver
@@ -40,6 +41,16 @@ def build_form_agent_graph():
         except Exception:
             logger.exception("LLM init failed; continuing without LLM acks")
             llm = None
+
+    # Load field-aware knowledge
+    knowledge: Dict[str, Any] = {}
+    try:
+        kb_path = Path(__file__).parent / "knowledge" / "service_auth_knowledge.json"
+        with open(kb_path, "r", encoding="utf-8") as f:
+            knowledge = json.load(f)
+        logger.info("Loaded service auth knowledge: fields=%s", list(knowledge.get("fields", {}).keys()))
+    except Exception:
+        logger.exception("Failed to load service auth knowledge; proceeding without it")
 
     class FormState(MessagesState):
         form: Dict[str, Any]
@@ -184,12 +195,18 @@ def build_form_agent_graph():
             if llm is None:
                 return None
             try:
+                field_info = knowledge.get("fields", {}).get(field, {})
+                f_format = field_info.get("format", "")
+                f_examples = "\n".join(["- " + ex for ex in field_info.get("examples", [])])
                 prompt = (
-                    "Extract the user's " + field.replace('_',' ') +
-                    " from the following message.\n" \
-                    "- Return only the value, no extra words.\n" \
-                    "- For email, return a valid email.\n" \
-                    "- For location, choose one of: office, site, remote.\n\n" \
+                    f"You are a field-aware intake assistant for {knowledge.get('domain','Service Desk')}.\n"
+                    f"Field: {field.replace('_',' ')}\n"
+                    f"Expected format: {f_format}\n"
+                    f"Examples:\n{f_examples}\n\n"
+                    "Task: Extract the user's answer for this field from the message.\n"
+                    "- Return only the value, no extra words.\n"
+                    "- For email, return a valid email like user@domain.tld.\n"
+                    "- For location, return exactly one of: office, site, remote.\n"
                     f"Message: {raw_text}"
                 )
                 resp = llm.invoke(prompt)  # type: ignore
