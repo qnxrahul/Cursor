@@ -40,6 +40,18 @@ export class ServiceRequestFormComponent implements OnDestroy {
     this.agui.start();
   }
 
+  onUserReply(input: string): void {
+    const text = (input || '').trim();
+    if (!text) return;
+    this.agui.send(text);
+  }
+
+  submit(): void {
+    if (this.form.valid) {
+      console.log('Submit payload', this.form.value);
+    }
+  }
+
   ngOnDestroy(): void {
     this.subs.forEach((x) => x.unsubscribe());
   }
