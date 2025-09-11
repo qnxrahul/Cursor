@@ -7,9 +7,7 @@ import { AguiService } from '../services/agui.service';
 })
 export class AguiChatComponent {
   input = '';
-  constructor(public agui: AguiService) {
-    this.agui.start();
-  }
+  constructor(public agui: AguiService) {}
 
   send() {
     const t = this.input.trim();
