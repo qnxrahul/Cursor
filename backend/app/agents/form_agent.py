@@ -348,7 +348,39 @@ def build_form_agent_graph():
             fields: List[Dict[str, Any]] = []
             submit_label: Optional[str] = None
             try:
-                # split by commas not inside parentheses
+                # LLM inference first from natural language description
+                def llm_infer_schema(description: str) -> Optional[Dict[str, Any]]:
+                    if llm is None:
+                        return None
+                    try:
+                        sys = (
+                            "You convert a user's natural language form description into a strict JSON schema.\n"
+                            "Return ONLY JSON with keys: title (string), fields (array of {key,label,type,required,options?}), submit_label?\n"
+                            "- type: one of text,email,number,date,textarea,select,radio,checkbox\n"
+                            "- options: for select/radio/checkbox as array of strings\n"
+                            "- key: lowercase_with_underscores\n"
+                            "Do not include explanations."
+                        )
+                        user = f"Form description: {description}"
+                        resp = llm.invoke([SystemMessage(content=sys), HumanMessage(content=user)])  # type: ignore
+                        content = getattr(resp, "content", "")
+                        start = content.find("{"); end = content.rfind("}")
+                        if start != -1 and end != -1 and end > start:
+                            return json.loads(content[start:end+1])
+                    except Exception:
+                        logger.exception("LLM schema inference failed")
+                    return None
+
+                inferred = llm_infer_schema(spec_text)
+                if inferred is not None and isinstance(inferred, dict) and isinstance(inferred.get("fields", []), list):
+                    state["schema"] = inferred
+                    state["form_type"] = (state.get("proposed_form_type") or inferred.get("title") or "custom").replace(" ", "_")
+                    state["schema_build_mode"] = False
+                    state["next_field_index"] = 0
+                    logger.debug("Built custom schema via LLM with %s fields", len(inferred.get("fields", [])))
+                    return state
+
+                # Fallback: split by commas not inside parentheses and parse key:type:required(options)
                 parts = re.split(r",(?=(?:[^()]*\([^()]*\))*[^()]*$)", spec_text)
                 for p in parts:
                     s = p.strip()
@@ -375,7 +407,6 @@ def build_form_agent_graph():
                         options = [o.strip() for o in opts.split(";") for o in o.split(",") if o.strip()]
                         if options:
                             field["options"] = options
-                    # checkboxes default to array
                     fields.append(field)
                 if not fields:
                     return state
