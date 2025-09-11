@@ -101,47 +101,33 @@ export class AguiService {
         // Merge rawEvent.output/input keys like form, next_field_index in addition to snapshot
         const prev = (this.state$.value || {}) as any;
         const next: any = { ...prev };
-        const raw = (e.rawEvent?.data?.output || e.rawEvent?.data?.input || {}) as any;
-        if (raw && typeof raw === 'object') {
-          if (raw.form) next.form = { ...(prev.form || {}), ...raw.form };
-          if (typeof raw.next_field_index === 'number') next.next_field_index = raw.next_field_index;
-          if (typeof raw.asked_index === 'number') next.asked_index = raw.asked_index;
+        const rawOut = (e.rawEvent?.data?.output || {}) as any;
+        const rawIn = (e.rawEvent?.data?.input || {}) as any;
+        // Determine if this STATE_SNAPSHOT corresponds to processing a human reply
+        let lastInputRole: 'user'|'assistant'|null = null;
+        const inMsgs = (rawIn?.messages || []) as any[];
+        if (Array.isArray(inMsgs) && inMsgs.length > 0) {
+          const lastIn = inMsgs[inMsgs.length - 1];
+          const t = lastIn?.type;
+          const r = lastIn?.role;
+          lastInputRole = r ? (r as any) : (t === 'human' ? 'user' : t === 'ai' ? 'assistant' : null);
+        }
+        // Only merge form when a human input was processed; prevents binding prompts to fields
+        if (rawOut && typeof rawOut === 'object') {
+          if (lastInputRole === 'user' && rawOut.form) next.form = { ...(prev.form || {}), ...rawOut.form };
+          if (typeof rawOut.next_field_index === 'number') next.next_field_index = rawOut.next_field_index;
+          if (typeof rawOut.asked_index === 'number') next.asked_index = rawOut.asked_index;
         }
         if (e.snapshot && typeof e.snapshot === 'object') {
           // e.snapshot often only includes messages/tools; keep merge minimal
           if (Array.isArray((e.snapshot as any).messages)) next.messages = (e.snapshot as any).messages;
         }
         this.state$.next(next);
-        // Fallback to render assistant message if none streamed yet this turn
-        if (!this.sawAssistantThisTurn) {
-          const msgs = (e.snapshot?.messages || []) as any[];
-          if (Array.isArray(msgs) && msgs.length > 0) {
-            const last = msgs[msgs.length - 1];
-            const t = last?.type;
-            const content = last?.content ?? '';
-            const role = t === 'human' ? 'user' : t === 'ai' ? 'assistant' : null as any;
-            if (role === 'assistant') {
-              const norm = String(content || '').trim();
-              const hash = `${role}:${norm}`;
-              if (this.lastSnapshotHash !== hash) {
-                const current = this.messages$.value;
-                const lastMsg = current[current.length - 1];
-                if (!(lastMsg && lastMsg.role === role && lastMsg.text.trim() === norm)) {
-                  this.appendMessage({ role, text: content });
-                }
-                this.lastSnapshotHash = hash;
-                this.lastAssistantText = content;
-                this.lastAssistantId = last?.id || null;
-                this.sawAssistantThisTurn = true;
-              }
-            }
-          }
-        }
         break;
       }
       case EventType.MESSAGES_SNAPSHOT: {
         const msgs = (e.messages || []) as any[];
-        if (Array.isArray(msgs) && !this.sawAssistantThisTurn && msgs.length > 0) {
+        if (Array.isArray(msgs) && msgs.length > 0) {
           const last = msgs[msgs.length - 1];
           const role = last?.role;
           const text = last?.content ?? '';
@@ -157,15 +143,7 @@ export class AguiService {
               this.lastSnapshotHash = hash;
               this.lastAssistantText = text;
               this.lastAssistantId = last?.id || null;
-              this.sawAssistantThisTurn = true;
             }
-          }
-        } else if (Array.isArray(msgs) && msgs.length > 0) {
-          // Even if streaming handled UI, keep assistant tracking in sync
-          const last = msgs[msgs.length - 1];
-          if (last?.role === 'assistant') {
-            this.lastAssistantText = last?.content ?? '';
-            this.lastAssistantId = last?.id || null;
           }
         }
         break;
