@@ -8,13 +8,15 @@ import { AppComponent } from './app.component';
 import { ServiceRequestFormComponent } from './service-request-form/service-request-form.component';
 import { ChatComponent } from './chat/chat.component';
 import { AguiChatComponent } from './agui-chat/agui-chat.component';
+import { ThemeCustomizerComponent } from './theme-customizer/theme-customizer.component';
 
 @NgModule({
   declarations: [
     AppComponent,
     ServiceRequestFormComponent,
     ChatComponent,
-    AguiChatComponent
+    AguiChatComponent,
+    ThemeCustomizerComponent
   ],
   imports: [
     BrowserModule,

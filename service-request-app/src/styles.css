@@ -1,1 +1,35 @@
+:root {
+  --app-primary: #0d6efd;
+  --app-accent: #6f42c1;
+  --app-card-bg: #ffffff;
+  --app-text: #212529;
+  --app-radius: 8px;
+  --app-font: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+}
+
+.card {
+  border-radius: var(--app-radius) !important;
+}
+
+.card .card-header {
+  background: color-mix(in srgb, var(--app-primary) 10%, transparent);
+  color: var(--app-text);
+}
+
+.card .card-body {
+  background: var(--app-card-bg);
+  color: var(--app-text);
+  font-family: var(--app-font);
+}
+
+.btn-primary {
+  background-color: var(--app-primary);
+  border-color: var(--app-primary);
+}
+
+.form-select:focus, .form-control:focus {
+  border-color: var(--app-accent);
+  box-shadow: 0 0 0 .2rem color-mix(in srgb, var(--app-accent) 25%, transparent);
+}
+
 /* You can add global styles to this file, and also import other style files */
