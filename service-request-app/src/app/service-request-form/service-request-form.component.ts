@@ -1,5 +1,5 @@
 import { Component, OnDestroy } from '@angular/core';
-import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { FormBuilder, FormGroup, Validators, FormControl } from '@angular/forms';
 import { Subscription } from 'rxjs';
 import { AguiService } from '../services/agui.service';
 
@@ -10,20 +10,33 @@ import { AguiService } from '../services/agui.service';
 export class ServiceRequestFormComponent implements OnDestroy {
   form: FormGroup;
   done = false;
+  schema: any = null;
   private subs: Subscription[] = [];
 
   constructor(private fb: FormBuilder, private agui: AguiService) {
-    this.form = this.fb.group({
-      name: ['', Validators.required],
-      email: ['', [Validators.required, Validators.email]],
-      issue_details: ['', Validators.required],
-      type: ['', Validators.required],
-      urgency: ['', Validators.required],
-      location: ['', Validators.required]
-    });
+    this.form = this.fb.group({});
 
     // Bind to agent state for incremental form patching
     const s = this.agui.state$.subscribe((st: any) => {
+      if (st && st['schema']) {
+        // Build dynamic controls if schema changed
+        const sameSchema = JSON.stringify(this.schema) === JSON.stringify(st['schema']);
+        this.schema = st['schema'];
+        if (!sameSchema) {
+          const group: Record<string, FormControl> = {} as any;
+          const fields = (this.schema?.fields || []) as any[];
+          for (const f of fields) {
+            const key = f.key;
+            const req = f.required === true;
+            const type = (f.type || 'text').toLowerCase();
+            const validators = [] as any[];
+            if (req) validators.push(Validators.required);
+            if (type === 'email') validators.push(Validators.email);
+            group[key] = new FormControl('', validators);
+          }
+          this.form = this.fb.group(group);
+        }
+      }
       if (st && st['form']) {
         const entries = Object.entries(st['form'] as Record<string, any>);
         for (const [k, v] of entries) {
@@ -31,7 +44,8 @@ export class ServiceRequestFormComponent implements OnDestroy {
         }
       }
       if (typeof st?.['next_field_index'] === 'number') {
-        this.done = st['next_field_index'] >= 6;
+        const total = Array.isArray(this.schema?.fields) ? this.schema.fields.length : 6;
+        this.done = st['next_field_index'] >= total;
       }
     });
     this.subs.push(s);

@@ -52,6 +52,16 @@ def build_form_agent_graph():
     except Exception:
         logger.exception("Failed to load service auth knowledge; proceeding without it")
 
+    # Load forms manifest for dynamic schemas
+    forms_manifest: Dict[str, Any] = {}
+    try:
+        fm_path = Path(__file__).parent / "forms_manifest.json"
+        with open(fm_path, "r", encoding="utf-8") as f:
+            forms_manifest = json.load(f)
+        logger.info("Loaded forms manifest: %s", list(forms_manifest.keys()))
+    except Exception:
+        logger.exception("Failed to load forms manifest; proceeding without it")
+
     class FormState(MessagesState):
         form: Dict[str, Any]
         next_field_index: int
@@ -60,6 +70,8 @@ def build_form_agent_graph():
         awaiting_confirmation: bool
         pending_field_index: Optional[int]
         pending_value: Optional[str]
+        schema: Optional[Dict[str, Any]]
+        form_type: Optional[str]
 
     def ensure_state_defaults(state: Dict[str, Any]) -> Dict[str, Any]:
         if "form" not in state:
@@ -76,11 +88,21 @@ def build_form_agent_graph():
             state["pending_field_index"] = None
         if "pending_value" not in state:
             state["pending_value"] = None
+        if "schema" not in state:
+            state["schema"] = None
+        if "form_type" not in state:
+            state["form_type"] = None
         return state
 
     async def ask_or_finish(state: Dict[str, Any]):
         state = ensure_state_defaults(state)
         logger.debug("ask_or_finish: next_field_index=%s asked_index=%s awaiting=%s", state.get("next_field_index"), state.get("asked_index"), state.get("awaiting_confirmation"))
+
+        # If schema not chosen yet, ask which form type user needs
+        if not state.get("schema"):
+            choices = ", ".join(sorted(forms_manifest.keys())) if forms_manifest else "service_auth"
+            msg = f"Which form would you like to fill? (choices: {choices})"
+            return {"messages": [AIMessage(content=msg)]}
 
         # If awaiting confirmation, ask to confirm the pending value
         if state.get("awaiting_confirmation") and state.get("pending_field_index") is not None:
@@ -93,7 +115,13 @@ def build_form_agent_graph():
                 "- Reply 'yes' to confirm\n- Reply 'no' to re-enter\n- Or type the correct value."
             )
             return {"messages": [AIMessage(content=confirm_text)]}
-        if state["next_field_index"] >= len(FIELDS):
+        # Use schema fields when available
+        fields_list = FIELDS
+        if state.get("schema") and isinstance(state["schema"], dict):
+            schema_fields = state["schema"].get("fields", [])
+            if schema_fields:
+                fields_list = [(f.get("key"), f.get("prompt") or f.get("label") or f.get("key")) for f in schema_fields]
+        if state["next_field_index"] >= len(fields_list):
             # All fields collected; summarize and end
             logger.debug("ask_or_finish: finished")
             return {
@@ -105,7 +133,7 @@ def build_form_agent_graph():
         if state.get("asked_index") == cur_idx:
             logger.debug("ask_or_finish: already asked for index %s, skipping emit", cur_idx)
             return {}
-        field_key, prompt = FIELDS[cur_idx]
+        field_key, prompt = fields_list[cur_idx]
         logger.debug("ask_or_finish: asking '%s' (idx=%s)", field_key, cur_idx)
         return {
             "messages": [AIMessage(content=prompt)],
@@ -253,8 +281,36 @@ def build_form_agent_graph():
             logger.debug("confirm: updated pending %s to '%s' (awaiting)", field_key, corrected)
             return state
 
+        # Handle form type selection if schema not set
+        if not state.get("schema"):
+            choice = (state.get("pending_user_text") or "").strip().lower()
+            state["pending_user_text"] = None
+            state["messages"] = []
+            selected_key = None
+            if choice in forms_manifest:
+                selected_key = choice
+            else:
+                # try synonyms
+                for k, v in forms_manifest.items():
+                    syns = [s.lower() for s in v.get("synonyms", [])]
+                    if any(s in choice for s in syns):
+                        selected_key = k
+                        break
+            if not selected_key:
+                return state  # ask_or_finish will ask again
+            state["schema"] = forms_manifest[selected_key]
+            state["form_type"] = selected_key
+            state["next_field_index"] = 0
+            logger.debug("Selected schema '%s' with %s fields", selected_key, len(state["schema"].get("fields", [])))
+            return state
+
         # Not awaiting: capture input and propose suggestion
+        # Use schema-driven field lookup
         field_key, _ = FIELDS[idx]
+        if state.get("schema") and isinstance(state["schema"], dict):
+            sf = state["schema"].get("fields", [])
+            if 0 <= idx < len(sf):
+                field_key = sf[idx].get("key", field_key)
         # Prefer transient pending_user_text if present; otherwise fall back to last human message
         pending = state.get("pending_user_text")
         messages = list(state.get("messages", []))

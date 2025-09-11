@@ -1,28 +1,22 @@
 <form [formGroup]="form" (ngSubmit)="submit()" class="row g-3">
-  <div class="col-md-6">
-    <label class="form-label">Name</label>
-    <input class="form-control" formControlName="name" />
-  </div>
-  <div class="col-md-6">
-    <label class="form-label">Email</label>
-    <input type="email" class="form-control" formControlName="email" />
-  </div>
-  <div class="col-12">
-    <label class="form-label">Issue Details</label>
-    <textarea rows="3" class="form-control" formControlName="issue_details"></textarea>
-  </div>
-  <div class="col-md-4">
-    <label class="form-label">Type</label>
-    <input class="form-control" formControlName="type" />
-  </div>
-  <div class="col-md-4">
-    <label class="form-label">Urgency</label>
-    <input class="form-control" formControlName="urgency" />
-  </div>
-  <div class="col-md-4">
-    <label class="form-label">Location</label>
-    <input class="form-control" formControlName="location" />
-  </div>
+  <ng-container *ngIf="schema?.fields as fields">
+    <ng-container *ngFor="let f of fields; let i = index">
+      <div class="col-12" [ngClass]="{'col-md-6': f.type!=='textarea' && f.type!=='select', 'col-md-4': f.type==='select'}">
+        <label class="form-label">{{ f.label || f.key }}</label>
+        <ng-container [ngSwitch]="f.type">
+          <input *ngSwitchCase="'text'" class="form-control" [formControlName]="f.key" />
+          <input *ngSwitchCase="'email'" type="email" class="form-control" [formControlName]="f.key" />
+          <input *ngSwitchCase="'number'" type="number" class="form-control" [formControlName]="f.key" />
+          <input *ngSwitchCase="'date'" type="date" class="form-control" [formControlName]="f.key" />
+          <textarea *ngSwitchCase="'textarea'" rows="3" class="form-control" [formControlName]="f.key"></textarea>
+          <select *ngSwitchCase="'select'" class="form-select" [formControlName]="f.key">
+            <option *ngFor="let opt of (f.options||[])" [value]="opt">{{ opt }}</option>
+          </select>
+          <input *ngSwitchDefault class="form-control" [formControlName]="f.key" />
+        </ng-container>
+      </div>
+    </ng-container>
+  </ng-container>
   <div class="col-12 d-flex justify-content-between align-items-center mt-2">
     <div class="text-muted" *ngIf="done">All fields collected from chat.</div>
     <button type="submit" class="btn btn-success" [disabled]="!form.valid">Submit</button>
