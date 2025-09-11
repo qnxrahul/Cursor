@@ -72,6 +72,8 @@ def build_form_agent_graph():
         pending_value: Optional[str]
         schema: Optional[Dict[str, Any]]
         form_type: Optional[str]
+        schema_confirmed: bool
+        theme: Optional[Dict[str, Any]]
 
     def ensure_state_defaults(state: Dict[str, Any]) -> Dict[str, Any]:
         if "form" not in state:
@@ -92,6 +94,10 @@ def build_form_agent_graph():
             state["schema"] = None
         if "form_type" not in state:
             state["form_type"] = None
+        if "schema_confirmed" not in state:
+            state["schema_confirmed"] = False
+        if "theme" not in state:
+            state["theme"] = None
         return state
 
     async def ask_or_finish(state: Dict[str, Any]):
@@ -102,6 +108,16 @@ def build_form_agent_graph():
         if not state.get("schema"):
             choices = ", ".join(sorted(forms_manifest.keys())) if forms_manifest else "service_auth"
             msg = f"Which form would you like to fill? (choices: {choices})"
+            return {"messages": [AIMessage(content=msg)]}
+
+        # If schema chosen but not confirmed, present fields and ask for changes
+        if not state.get("schema_confirmed"):
+            fields = [f.get("label") or f.get("key") for f in state["schema"].get("fields", [])]
+            preview = "\n - " + "\n - ".join(fields) if fields else " (no fields)"
+            msg = (
+                f"I will render the '{state.get('form_type')}' with these fields:{preview}\n"
+                "Reply 'yes' to confirm, 'no' to change, or specify changes (e.g., add field amount:number:required, remove field urgency, theme {\"primary\": \"#0052cc\"})."
+            )
             return {"messages": [AIMessage(content=msg)]}
 
         # If awaiting confirmation, ask to confirm the pending value
@@ -302,6 +318,63 @@ def build_form_agent_graph():
             state["form_type"] = selected_key
             state["next_field_index"] = 0
             logger.debug("Selected schema '%s' with %s fields", selected_key, len(state["schema"].get("fields", [])))
+            return state
+
+        # If schema not confirmed, parse confirmation or change commands
+        if not state.get("schema_confirmed"):
+            txt = (state.get("pending_user_text") or "").strip()
+            state["pending_user_text"] = None
+            state["messages"] = []
+            if not txt:
+                return state
+            low = txt.lower()
+            if low in ("yes", "y", "ok", "okay", "confirm", "looks good"):
+                state["schema_confirmed"] = True
+                logger.debug("Schema confirmed by user")
+                return state
+            if low in ("no", "n", "change", "edit"):
+                logger.debug("User requested schema changes; waiting for specifics")
+                return state
+            # Simple command parsing
+            # theme {json}
+            if "theme" in low and "{" in txt and "}" in txt:
+                try:
+                    json_start = txt.index("{")
+                    json_end = txt.rindex("}") + 1
+                    obj = json.loads(txt[json_start:json_end])
+                    if isinstance(obj, dict):
+                        state["theme"] = obj
+                        logger.debug("Applied theme update: %s", obj)
+                        return state
+                except Exception:
+                    logger.exception("Failed to parse theme JSON")
+                    return state
+            # add field key[:type[:required]]
+            if low.startswith("add field"):
+                try:
+                    parts = txt.split()
+                    spec = parts[2] if len(parts) > 2 else ""
+                    segs = spec.split(":")
+                    key = segs[0]
+                    ftype = (segs[1] if len(segs) > 1 else "text").lower()
+                    req = (segs[2].lower() == "required") if len(segs) > 2 else False
+                    new_f = {"key": key, "label": key.replace("_"," ").replace("-"," ").replace("  "," ").trim().title(), "type": ftype, "required": req}
+                    state["schema"]["fields"].append(new_f)  # type: ignore
+                    logger.debug("Added field: %s", new_f)
+                except Exception:
+                    logger.exception("Failed to add field from spec: %s", txt)
+                return state
+            if low.startswith("remove field"):
+                try:
+                    parts = txt.split()
+                    key = parts[2]
+                    fields = state["schema"]["fields"]  # type: ignore
+                    state["schema"]["fields"] = [f for f in fields if f.get("key") != key]  # type: ignore
+                    logger.debug("Removed field: %s", key)
+                except Exception:
+                    logger.exception("Failed to remove field from spec: %s", txt)
+                return state
+            # Unrecognized change command; ignore
             return state
 
         # Not awaiting: capture input and propose suggestion

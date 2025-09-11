@@ -121,6 +121,8 @@ export class AguiService {
           if (typeof raw.asked_index === 'number') next.asked_index = raw.asked_index;
           if (raw.schema) next.schema = raw.schema;
           if (raw.form_type) next.form_type = raw.form_type;
+          if (raw.theme) next.theme = raw.theme;
+          if (typeof raw.schema_confirmed === 'boolean') next.schema_confirmed = raw.schema_confirmed;
         }
         if (e.snapshot && typeof e.snapshot === 'object') {
           // e.snapshot often only includes messages/tools; keep merge minimal
