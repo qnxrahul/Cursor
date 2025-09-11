@@ -90,8 +90,12 @@ export class AguiService {
         break;
       case EventType.TEXT_MESSAGE_START: {
         this.turnHasTextStream = true;
+        const msgs = this.messages$.value;
+        const last = msgs[msgs.length - 1];
+        if (!(last && last.role === 'assistant')) {
+          this.appendMessage({ role: 'assistant', text: '' });
+        }
         this.sawAssistantThisTurn = true;
-        this.appendMessage({ role: 'assistant', text: '' });
         break;
       }
       case EventType.TEXT_MESSAGE_CONTENT: {
@@ -184,6 +188,7 @@ export class AguiService {
       case EventType.RUN_FINISHED:
         // allow new sends after run finishes
         this.turnHasTextStream = false;
+        this.sawAssistantThisTurn = false;
         break;
     }
   }
