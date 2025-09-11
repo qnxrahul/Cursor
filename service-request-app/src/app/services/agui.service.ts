@@ -111,25 +111,14 @@ export class AguiService {
         break;
       }
       case EventType.STATE_SNAPSHOT: {
-        // Merge rawEvent.output/input keys like form, next_field_index in addition to snapshot
+        // Merge rawEvent output/input (always merge form if present)
         const prev = (this.state$.value || {}) as any;
         const next: any = { ...prev };
-        const rawOut = (e.rawEvent?.data?.output || {}) as any;
-        const rawIn = (e.rawEvent?.data?.input || {}) as any;
-        // Determine if this STATE_SNAPSHOT corresponds to processing a human reply
-        let lastInputRole: 'user'|'assistant'|null = null;
-        const inMsgs = (rawIn?.messages || []) as any[];
-        if (Array.isArray(inMsgs) && inMsgs.length > 0) {
-          const lastIn = inMsgs[inMsgs.length - 1];
-          const t = lastIn?.type;
-          const r = lastIn?.role;
-          lastInputRole = r ? (r as any) : (t === 'human' ? 'user' : t === 'ai' ? 'assistant' : null);
-        }
-        // Only merge form when a human input was processed; prevents binding prompts to fields
-        if (rawOut && typeof rawOut === 'object') {
-          if (lastInputRole === 'user' && rawOut.form) next.form = { ...(prev.form || {}), ...rawOut.form };
-          if (typeof rawOut.next_field_index === 'number') next.next_field_index = rawOut.next_field_index;
-          if (typeof rawOut.asked_index === 'number') next.asked_index = rawOut.asked_index;
+        const raw = (e.rawEvent?.data?.output || e.rawEvent?.data?.input || {}) as any;
+        if (raw && typeof raw === 'object') {
+          if (raw.form) next.form = { ...(prev.form || {}), ...raw.form };
+          if (typeof raw.next_field_index === 'number') next.next_field_index = raw.next_field_index;
+          if (typeof raw.asked_index === 'number') next.asked_index = raw.asked_index;
         }
         if (e.snapshot && typeof e.snapshot === 'object') {
           // e.snapshot often only includes messages/tools; keep merge minimal
