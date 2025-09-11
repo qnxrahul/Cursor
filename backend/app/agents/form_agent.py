@@ -561,11 +561,25 @@ def build_form_agent_graph():
                 return state
             if low.startswith("remove field"):
                 try:
-                    parts = txt.split()
-                    key = parts[2]
+                    # Capture everything after 'remove field '
+                    m = re.search(r"remove\s+field\s+(.+)$", txt, flags=re.IGNORECASE)
+                    name_raw = m.group(1).strip() if m else (txt.split(maxsplit=2)[2] if len(txt.split()) > 2 else "")
+                    # Normalize to a key-like form (snake)
+                    name_key = re.sub(r"[^a-z0-9_]+", "_", name_raw.strip().lower().replace(" ", "_")).strip("_")
+                    name_label_lower = " ".join(name_raw.strip().lower().split())
                     fields = state["schema"]["fields"]  # type: ignore
-                    state["schema"]["fields"] = [f for f in fields if f.get("key") != key]  # type: ignore
-                    logger.debug("Removed field: %s", key)
+                    new_fields = []
+                    removed = []
+                    for f in fields:
+                        fk = str(f.get("key", "")).strip().lower()
+                        fl = str(f.get("label", "")).strip().lower()
+                        fl_norm = " ".join(fl.split())
+                        if fk == name_key or fl_norm == name_label_lower:
+                            removed.append(f)
+                            continue
+                        new_fields.append(f)
+                    state["schema"]["fields"] = new_fields  # type: ignore
+                    logger.debug("Removed fields matching '%s' (key=%s): %s", name_raw, name_key, len(removed))
                 except Exception:
                     logger.exception("Failed to remove field from spec: %s", txt)
                 return state
