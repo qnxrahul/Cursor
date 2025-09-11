@@ -32,7 +32,8 @@ export class ServiceRequestFormComponent implements OnDestroy {
             const validators = [] as any[];
             if (req) validators.push(Validators.required);
             if (type === 'email') validators.push(Validators.email);
-            group[key] = new FormControl('', validators);
+            const initial = type === 'checkbox' ? [] : '';
+            group[key] = new FormControl(initial, validators);
           }
           this.form = this.fb.group(group);
         }
@@ -57,6 +58,26 @@ export class ServiceRequestFormComponent implements OnDestroy {
     const text = (input || '').trim();
     if (!text) return;
     this.agui.send(text);
+  }
+
+  isChecked(fieldKey: string, option: any): boolean {
+    const val = this.form.get(fieldKey)?.value;
+    return Array.isArray(val) ? val.indexOf(option) !== -1 : false;
+  }
+
+  toggleCheckbox(fieldKey: string, option: any, ev: Event): void {
+    const input = ev.target as HTMLInputElement;
+    const ctrl = this.form.get(fieldKey);
+    if (!ctrl) return;
+    const curr = Array.isArray(ctrl.value) ? [...ctrl.value] : [];
+    if (input.checked) {
+      if (curr.indexOf(option) === -1) curr.push(option);
+    } else {
+      const idx = curr.indexOf(option);
+      if (idx !== -1) curr.splice(idx, 1);
+    }
+    ctrl.setValue(curr);
+    ctrl.markAsDirty();
   }
 
   submit(): void {
