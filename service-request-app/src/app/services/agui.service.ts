@@ -121,11 +121,7 @@ export class AguiService {
           if (Array.isArray((e.snapshot as any).messages)) next.messages = (e.snapshot as any).messages;
         }
         this.state$.next(next);
-<<<<<<< HEAD
-        // Fallback to render assistant message if there was no streaming this turn
-=======
         // Fallback to render assistant message if none streamed yet this turn
->>>>>>> 68a0c38de873c24a83129a5725fbed219daf6670
         if (!this.sawAssistantThisTurn) {
           const msgs = (e.snapshot?.messages || []) as any[];
           if (Array.isArray(msgs) && msgs.length > 0) {
@@ -192,4 +188,3 @@ export class AguiService {
     }
   }
 }
-
