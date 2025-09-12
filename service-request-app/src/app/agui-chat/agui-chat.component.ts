@@ -69,20 +69,33 @@ export class AguiChatComponent implements OnInit, OnDestroy {
 
     // If we previously asked for field specs, forward them to backend as a creation request
     if (this.awaitingFieldSpec) {
-      // Try to parse locally and generate schema
+      // Finish collecting fields
+      if (this.isDoneAdding(lower)) {
+        this.awaitingFieldSpec = false;
+        const msgs = this.agui.messages$.value.slice();
+        msgs.push({ role: 'user', text: t });
+        msgs.push({ role: 'assistant', text: 'Okay. The form is ready.' });
+        this.agui.messages$.next(msgs);
+        this.input = '';
+        return;
+      }
+
+      // Try to parse locally and generate/merge schema
       const parsed = this.parseFormSpec(t);
       if (parsed) {
-        const { schema, submitLabel, formType } = parsed as any;
+        const { schema: newSchema, submitLabel, formType } = parsed as any;
         const prev = this.agui.state$.value || {};
-        const next: any = { ...prev, schema, allow_submit: true };
-        if (formType) next.form_type = formType;
-        if (submitLabel) next.schema = { ...schema, submitLabel };
+        const prevSchema = (prev as any).schema || { fields: [] };
+        const mergedFields = this.mergeFields(prevSchema.fields || [], newSchema.fields || []);
+        const schemaOut: any = { ...prevSchema, fields: mergedFields };
+        if (submitLabel) schemaOut.submitLabel = submitLabel; else if (prevSchema.submitLabel) schemaOut.submitLabel = prevSchema.submitLabel;
+        const next: any = { ...prev, schema: schemaOut, allow_submit: true };
+        if (formType) next.form_type = formType; else if ((prev as any).form_type) next.form_type = (prev as any).form_type;
         this.agui.state$.next(next);
         const msgs = this.agui.messages$.value.slice();
         msgs.push({ role: 'user', text: t });
-        msgs.push({ role: 'assistant', text: `Generated ${formType ? (formType.charAt(0).toUpperCase()+formType.slice(1)) : 'form'} with ${schema.fields.length} field(s).` });
+        msgs.push({ role: 'assistant', text: `Added ${newSchema.fields.length} field(s). You can add more or type 'done'.` });
         this.agui.messages$.next(msgs);
-        this.awaitingFieldSpec = false;
         this.optionsAllowed = false;
         this.input = '';
         return;
@@ -90,7 +103,7 @@ export class AguiChatComponent implements OnInit, OnDestroy {
         // Fallback to backend if parsing fails
         const prompt = `Create a dynamic form with these fields: ${t}`;
         this.agui.send(prompt);
-        this.awaitingFieldSpec = false;
+        // Keep awaiting so subsequent adds are merged
         const prev = this.agui.state$.value || {};
         this.agui.state$.next({ ...prev, allow_submit: true });
         this.input = '';
@@ -215,6 +228,11 @@ export class AguiChatComponent implements OnInit, OnDestroy {
     const intentHints = ['create', 'build', 'make', 'need', 'want', 'request', 'form'];
     if (intentHints.some(h => lower.includes(h))) return false;
     return true;
+  }
+
+  private isDoneAdding(lower: string): boolean {
+    const tokens = ['done', "that's all", 'no more', 'finish', 'finished'];
+    return tokens.some(t => lower === t || lower.startsWith(t + ' '));
   }
 
   // -------- NL field spec parsing helpers --------
@@ -405,6 +423,17 @@ export class AguiChatComponent implements OnInit, OnDestroy {
     if (typeof opts?.required === 'boolean') field.required = opts.required;
     if (Array.isArray(opts?.options) && (type === 'select' || type === 'radio' || type === 'checkbox')) field.options = opts.options;
     return field;
+  }
+
+  private mergeFields(existing: any[], additions: any[]): any[] {
+    const map = new Map<string, any>();
+    for (const f of existing || []) {
+      map.set(f.key, { ...f });
+    }
+    for (const nf of additions || []) {
+      map.set(nf.key, { ...map.get(nf.key), ...nf });
+    }
+    return Array.from(map.values());
   }
 }
 
