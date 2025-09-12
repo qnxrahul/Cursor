@@ -71,18 +71,32 @@ export class AguiChatComponent implements OnInit, OnDestroy {
     if (this.awaitingFieldSpec) {
       // Finish collecting fields
       if (this.isDoneAdding(lower)) {
+        this.agui.send('done');
         this.awaitingFieldSpec = false;
-        const msgs = this.agui.messages$.value.slice();
-        msgs.push({ role: 'user', text: t });
-        msgs.push({ role: 'assistant', text: 'Okay. The form is ready.' });
-        this.agui.messages$.next(msgs);
         this.input = '';
         return;
       }
-      // Always send to AI
-      const prompt = this.state?.schema
-        ? `Update the current form by adding these fields and CSS preferences: ${t}`
-        : `Create a dynamic form with these fields and CSS preferences: ${t}`;
+      // Handle explicit yes/no confirmations from agent prompt
+      if (this.isAffirmative(t)) {
+        this.agui.send('yes');
+        this.awaitingFieldSpec = false;
+        const prev = this.agui.state$.value || {};
+        this.agui.state$.next({ ...prev, allow_submit: true });
+        this.input = '';
+        return;
+      }
+      if (this.isNegative(t)) {
+        // Tell agent user wants to change; keep waiting
+        this.agui.send('no');
+        this.input = '';
+        return;
+      }
+      // Always send to AI; only wrap with update/create if it looks like a spec
+      const hasSchema = !!this.state?.schema;
+      const looksLikeSpec = this.isSpecOrChange(lower);
+      const prompt = hasSchema
+        ? (looksLikeSpec ? `Update the current form by adding these fields and CSS preferences: ${t}` : t)
+        : (looksLikeSpec ? `Create a dynamic form with these fields and CSS preferences: ${t}` : t);
       this.agui.send(prompt);
       // Keep awaiting spec so user can add more
       const prev = this.agui.state$.value || {};
@@ -175,6 +189,16 @@ export class AguiChatComponent implements OnInit, OnDestroy {
   private isNegative(text: string): boolean {
     const s = (text || '').trim().toLowerCase();
     return s === 'no' || s === 'n' || s.startsWith('no ') || s.includes(' no') || s.includes("don't") || s.includes('do not');
+  }
+  private isSpecOrChange(lower: string): boolean {
+    // Heuristics to decide if user typed fields/options/theme changes
+    return (
+      /:\s*(text|email|number|date|radio|select|textarea)/.test(lower) ||
+      /(required|optional)/.test(lower) ||
+      /(with|having)\s+[a-z0-9 ,\/\-\[\]]+/.test(lower) ||
+      /theme\s*\{/.test(lower) ||
+      /add\s+field|remove\s+field|change\s+label/.test(lower)
+    );
   }
 
   private parseRequestKey(lower: string): string | null {
