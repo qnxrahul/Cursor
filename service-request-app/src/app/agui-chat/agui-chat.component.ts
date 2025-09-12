@@ -11,6 +11,7 @@ export class AguiChatComponent implements OnInit, OnDestroy {
   state: any = {};
   private sub?: Subscription;
   showCustomizer = false;
+  private awaitingFieldSpec = false;
   // Known requests (should mirror backend manifest keys)
   requests = [
     { key: 'service_auth', label: 'Service Authorization Request' },
@@ -30,6 +31,30 @@ export class AguiChatComponent implements OnInit, OnDestroy {
   send() {
     const t = this.input.trim();
     if (!t) return;
+
+    // If we previously asked for field specs, forward them to backend as a creation request
+    if (this.awaitingFieldSpec) {
+      const prompt = `Create a dynamic form with these fields: ${t}`;
+      this.agui.send(prompt);
+      this.awaitingFieldSpec = false;
+      this.input = '';
+      return;
+    }
+
+    // Detect intent to create a new form type and prompt for field details
+    const lower = t.toLowerCase();
+    const asksNewForm = lower.includes('new type of form') || lower.includes('create a dynamic form') || lower.includes('new form');
+    if (asksNewForm) {
+      // Append user's message and assistant guidance locally without hitting backend yet
+      const msgs = this.agui.messages$.value.slice();
+      msgs.push({ role: 'user', text: t });
+      msgs.push({ role: 'assistant', text: 'Sure — please share the field names and types (e.g., text, number, date, radio, checkbox, select, textarea). For example: name:text, age:number, start_date:date, department:select[HR,Finance,IT].' });
+      this.agui.messages$.next(msgs);
+      this.awaitingFieldSpec = true;
+      this.input = '';
+      return;
+    }
+
     this.agui.send(t);
     this.input = '';
   }
@@ -47,10 +72,10 @@ export class AguiChatComponent implements OnInit, OnDestroy {
     this.showCustomizer = !this.showCustomizer;
   }
 
-  hideIntro() {
-    const current = this.agui.messages$.value || [];
-    const filtered = current.filter(m => !(m.role === 'assistant' && this.isIntroText(m.text)));
-    this.agui.messages$.next(filtered);
+  clearFields() {
+    const prev = this.agui.state$.value || {};
+    const next = { ...prev, form: {} };
+    this.agui.state$.next(next);
   }
 
   private isIntroText(text: string): boolean {
