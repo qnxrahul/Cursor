@@ -104,6 +104,17 @@ export class AguiChatComponent implements OnInit, OnDestroy {
       this.agui.state$.next({ ...prev, allow_submit: true });
     }
 
+    // Friendly gating if the user simply greets without asking for anything specific
+    if (this.isGreetingOnly(lower)) {
+      const msgs = this.agui.messages$.value.slice();
+      msgs.push({ role: 'user', text: t });
+      msgs.push({ role: 'assistant', text: "Hi, I'm HelpDesk Assistant. I can help you create and submit IT helpdesk related requests. Here are some requests I can create right away, or you can instruct me to create a dynamic form for you. Say 'yes' or 'no' to continue." });
+      this.agui.messages$.next(msgs);
+      this.awaitingYesNo = true;
+      this.input = '';
+      return;
+    }
+
     // Out-of-scope: apologize and ask yes/no to continue
     const msgs = this.agui.messages$.value.slice();
     msgs.push({ role: 'user', text: t });
@@ -167,6 +178,19 @@ export class AguiChatComponent implements OnInit, OnDestroy {
     if (/(^|\s)form for\s+.+/.test(lower)) return true;
     if (/\b\w+\s+form\b/.test(lower)) return true; // e.g., "policy form"
     return false;
+  }
+
+  private isGreetingOnly(lower: string): boolean {
+    const greetTokens = ['hi', 'hello', 'hey', 'good morning', 'good afternoon', 'good evening'];
+    const isGreet = greetTokens.some(k => lower === k || lower.startsWith(k + ' ') || lower.endsWith(' ' + k) || lower.includes(' ' + k + ' '));
+    if (!isGreet) return false;
+    // Not asking for a known request or dynamic form
+    if (this.parseRequestKey(lower)) return false;
+    if (this.isDynamicFormIntent(lower)) return false;
+    // No action verbs indicating intent
+    const intentHints = ['create', 'build', 'make', 'need', 'want', 'request', 'form'];
+    if (intentHints.some(h => lower.includes(h))) return false;
+    return true;
   }
 }
 
