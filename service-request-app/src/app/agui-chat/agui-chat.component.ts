@@ -14,6 +14,7 @@ export class AguiChatComponent implements OnInit, OnDestroy {
   awaitingFieldSpec = false;
   hasUserResponded = false;
   userDeclined = false;
+  awaitingYesNo = false;
   // Known requests (should mirror backend manifest keys)
   requests = [
     { key: 'service_auth', label: 'Service Authorization Request' },
@@ -40,13 +41,24 @@ export class AguiChatComponent implements OnInit, OnDestroy {
     if (!t) return;
     this.hasUserResponded = true;
 
-    // If user declines creating requests
-    if (this.isDecline(t)) {
+    // Handle outstanding yes/no prompt
+    if (this.awaitingYesNo) {
+      const affirmative = this.isAffirmative(t);
+      const negative = this.isNegative(t);
       const msgs = this.agui.messages$.value.slice();
       msgs.push({ role: 'user', text: t });
-      msgs.push({ role: 'assistant', text: 'I am limited to creating different IT service requests and dynamic form generation.' });
+      if (affirmative) {
+        msgs.push({ role: 'assistant', text: 'Great — please choose a request below or describe a new form.' });
+        this.awaitingYesNo = false;
+        this.userDeclined = false;
+      } else if (negative) {
+        msgs.push({ role: 'assistant', text: 'I am limited to creating different IT service requests and dynamic form generation.' });
+        this.awaitingYesNo = false;
+        this.userDeclined = true;
+      } else {
+        msgs.push({ role: 'assistant', text: "Please reply 'yes' to continue or 'no' to cancel." });
+      }
       this.agui.messages$.next(msgs);
-      this.userDeclined = true;
       this.input = '';
       return;
     }
@@ -84,6 +96,23 @@ export class AguiChatComponent implements OnInit, OnDestroy {
       this.agui.state$.next({ ...prev, allow_submit: true });
     }
 
+    // If input matches a known request, route to backend
+    const reqKey = this.parseRequestKey(lower);
+    if (reqKey) {
+      this.agui.send(reqKey);
+      this.input = '';
+      return;
+    }
+
+    // Out-of-scope: apologize and ask yes/no to continue
+    const msgs = this.agui.messages$.value.slice();
+    msgs.push({ role: 'user', text: t });
+    msgs.push({ role: 'assistant', text: "Hi, I'm HelpDesk Assistant. Sorry, I can help you create and submit IT helpdesk related requests. Here are some requests I can create right away, or you can instruct me to create a dynamic form for you. Say 'yes' or 'no' to continue." });
+    this.agui.messages$.next(msgs);
+    this.awaitingYesNo = true;
+    this.input = '';
+    return;
+
     this.agui.send(t);
     this.input = '';
   }
@@ -94,7 +123,7 @@ export class AguiChatComponent implements OnInit, OnDestroy {
 
   get showWelcome(): boolean {
     // Show welcome chooser if no schema chosen yet
-    return !this.state?.schema && this.hasUserResponded && !this.userDeclined;
+    return !this.state?.schema && this.hasUserResponded && !this.userDeclined && !this.awaitingYesNo;
   }
 
   // customization and clear fields actions removed per request
@@ -109,9 +138,27 @@ export class AguiChatComponent implements OnInit, OnDestroy {
            t.includes("bonafide certificate");
   }
 
-  private isDecline(text: string): boolean {
-    const s = (text || '').toLowerCase();
-    return s.includes("don't create") || s.includes("do not create") || s.includes("no request") || s.includes("no requests") || s.includes("not create any request") || s.includes("no, thanks") || s.includes("no thanks");
+  private isAffirmative(text: string): boolean {
+    const s = (text || '').trim().toLowerCase();
+    return s === 'yes' || s === 'y' || s.startsWith('yes ') || s.includes(' yes') || s === 'sure' || s.startsWith('sure');
+  }
+
+  private isNegative(text: string): boolean {
+    const s = (text || '').trim().toLowerCase();
+    return s === 'no' || s === 'n' || s.startsWith('no ') || s.includes(' no') || s.includes("don't") || s.includes('do not');
+  }
+
+  private parseRequestKey(lower: string): string | null {
+    const mapping: { key: string; hints: string[] }[] = [
+      { key: 'service_auth', hints: ['service authorization', 'service_auth'] },
+      { key: 'exit_request', hints: ['exit request', 'exit_request'] },
+      { key: 'reimbursement', hints: ['reimbursement'] },
+      { key: 'bonafide_certificate', hints: ['bonafide certificate', 'bonafide_certificate'] }
+    ];
+    for (const m of mapping) {
+      if (m.hints.some(h => lower.includes(h))) return m.key;
+    }
+    return null;
   }
 }
 
