@@ -405,6 +405,14 @@ def build_form_agent_graph():
                     submit_label = msub_global.group(1).strip().strip("'\"` ").title()
                 # split description into chunks by ',', 'and', newlines, semicolons, periods
                 raw_chunks = re.split(r"\s*(?:,|\band\b|\n|;|\.)\s+", desc, flags=re.IGNORECASE)
+                # additionally split on ") " boundaries (end of meta) followed by a Capitalized field start
+                refined_chunks: List[str] = []
+                for ck in raw_chunks:
+                    if ")" in ck and re.search(r"\)\s+[A-Z]", ck):
+                        refined_chunks.extend(re.split(r"\)\s+(?=[A-Z])", ck))
+                    else:
+                        refined_chunks.append(ck)
+                raw_chunks = [c.strip() for c in refined_chunks if c.strip()]
                 for chunk in raw_chunks:
                     s = chunk.strip()
                     if not s:
@@ -452,6 +460,27 @@ def build_form_agent_graph():
                             raw = mopts2.group(1)
                             options = [o.strip() for o in re.split(r",|/|\bor\b", raw) if o.strip()]
 
+                    # non-parenthesized cues
+                    if ftype == "text":
+                        if re.search(r"\bemail\b", low):
+                            ftype = "email"
+                        elif re.search(r"\bpassword\b", low):
+                            ftype = "password"
+                        elif re.search(r"\btel\b|\bphone\b|\bphone number\b", low):
+                            ftype = "tel"
+                        elif re.search(r"\bnumber\b|amount|total|quantity|deposit", low):
+                            ftype = "number"
+                        elif re.search(r"\bdate\b|last working day|date of birth|dob", low):
+                            ftype = "date"
+                        elif re.search(r"\btext\s*area\b|\btextarea\b|multiline|comments|description|address", low):
+                            ftype = "textarea"
+                        elif re.search(r"\bselect\b|\bdropdown\b", low):
+                            ftype = "select"
+                        elif re.search(r"\bradio\b", low):
+                            ftype = "radio"
+                        elif re.search(r"\bcheckbox\b|check\s*boxes", low):
+                            ftype = "checkbox"
+
                     # parse options
                     if ftype in ("select", "radio", "checkbox"):
                         # look for 'with pending/approved' or 'yes/no'
@@ -465,7 +494,6 @@ def build_form_agent_graph():
                         if re.search(r"yes\s*/\s*no|yes\s*no", low):
                             options = ["yes", "no"]
                         if re.search(r"fiscal year", low) and not options:
-                            # generate recent fiscal years as options
                             from datetime import datetime
                             y = datetime.utcnow().year
                             options = [f"FY{y-1}-{y}", f"FY{y}-{y+1}", f"FY{y+1}-{y+2}"]
