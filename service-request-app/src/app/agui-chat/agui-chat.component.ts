@@ -67,7 +67,7 @@ export class AguiChatComponent implements OnInit, OnDestroy {
       return;
     }
 
-    // If we previously asked for field specs, forward them to backend as a creation request
+    // If we previously asked for field specs, ALWAYS forward to AI agent
     if (this.awaitingFieldSpec) {
       // Finish collecting fields
       if (this.isDoneAdding(lower)) {
@@ -79,36 +79,16 @@ export class AguiChatComponent implements OnInit, OnDestroy {
         this.input = '';
         return;
       }
-
-      // Try to parse locally and generate/merge schema
-      const parsed = this.parseFormSpec(t);
-      if (parsed) {
-        const { schema: newSchema, submitLabel, formType } = parsed as any;
-        const prev = this.agui.state$.value || {};
-        const prevSchema = (prev as any).schema || { fields: [] };
-        const mergedFields = this.mergeFields(prevSchema.fields || [], newSchema.fields || []);
-        const schemaOut: any = { ...prevSchema, fields: mergedFields };
-        if (submitLabel) schemaOut.submitLabel = submitLabel; else if (prevSchema.submitLabel) schemaOut.submitLabel = prevSchema.submitLabel;
-        const next: any = { ...prev, schema: schemaOut, allow_submit: true };
-        if (formType) next.form_type = formType; else if ((prev as any).form_type) next.form_type = (prev as any).form_type;
-        this.agui.state$.next(next);
-        const msgs = this.agui.messages$.value.slice();
-        msgs.push({ role: 'user', text: t });
-        msgs.push({ role: 'assistant', text: `Added ${newSchema.fields.length} field(s). You can add more or type 'done'.` });
-        this.agui.messages$.next(msgs);
-        this.optionsAllowed = false;
-        this.input = '';
-        return;
-      } else {
-        // Fallback to backend if parsing fails
-        const prompt = `Create a dynamic form with these fields: ${t}`;
-        this.agui.send(prompt);
-        // Keep awaiting so subsequent adds are merged
-        const prev = this.agui.state$.value || {};
-        this.agui.state$.next({ ...prev, allow_submit: true });
-        this.input = '';
-        return;
-      }
+      // Always send to AI
+      const prompt = this.state?.schema
+        ? `Update the current form by adding these fields and CSS preferences: ${t}`
+        : `Create a dynamic form with these fields and CSS preferences: ${t}`;
+      this.agui.send(prompt);
+      // Keep awaiting spec so user can add more
+      const prev = this.agui.state$.value || {};
+      this.agui.state$.next({ ...prev, allow_submit: true });
+      this.input = '';
+      return;
     }
 
     // If input matches a known request, route to backend immediately
@@ -123,7 +103,8 @@ export class AguiChatComponent implements OnInit, OnDestroy {
     // Detect intent to create a new custom form (e.g., "I need policy form")
     const asksNewForm = this.isDynamicFormIntent(lower);
     if (asksNewForm) {
-      // Append user's message and assistant guidance locally without hitting backend yet
+      // Notify AI agent of intent and ask for specs to ensure consistent context
+      this.agui.send(`User wants to create a new dynamic form: ${t}. Ask for fields and CSS preferences.`);
       const msgs = this.agui.messages$.value.slice();
       msgs.push({ role: 'user', text: t });
       msgs.push({ role: 'assistant', text: 'Sure — what fields do you want to add and any CSS preferences (primary, accent, card background, text color, corner radius, font)? For example: name:text, age:number, start_date:date, department:select[HR,Finance,IT].' });
