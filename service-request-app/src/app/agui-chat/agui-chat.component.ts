@@ -10,6 +10,7 @@ export class AguiChatComponent implements OnInit, OnDestroy {
   input = '';
   state: any = {};
   private sub?: Subscription;
+  showCustomizer = false;
   // Known requests (should mirror backend manifest keys)
   requests = [
     { key: 'service_auth', label: 'Service Authorization Request' },
@@ -40,6 +41,26 @@ export class AguiChatComponent implements OnInit, OnDestroy {
   get showWelcome(): boolean {
     // Show welcome chooser if no schema chosen yet
     return !this.state?.schema;
+  }
+
+  toggleCustomizer() {
+    this.showCustomizer = !this.showCustomizer;
+  }
+
+  hideIntro() {
+    const current = this.agui.messages$.value || [];
+    const filtered = current.filter(m => !(m.role === 'assistant' && this.isIntroText(m.text)));
+    this.agui.messages$.next(filtered);
+  }
+
+  private isIntroText(text: string): boolean {
+    const t = (text || '').toLowerCase();
+    return t.includes("helpdesk assistant") ||
+           t.includes("tell me which one you want") ||
+           t.includes("service authorization request") ||
+           t.includes("exit request") ||
+           t.includes("reimbursement") ||
+           t.includes("bonafide certificate");
   }
 }
 

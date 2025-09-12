@@ -13,6 +13,15 @@
       </div>
     </div>
 
+    <!-- Action bar after selection -->
+    <div *ngIf="!showWelcome" class="d-flex align-items-center gap-2 mb-3">
+      <button class="btn btn-outline-secondary btn-sm" (click)="hideIntro()">Hide intro</button>
+      <button class="btn btn-outline-primary btn-sm" (click)="toggleCustomizer()">{{ showCustomizer ? 'Close' : 'Customize theme' }}</button>
+    </div>
+    <div *ngIf="!showWelcome && showCustomizer" class="mb-3">
+      <app-theme-customizer></app-theme-customizer>
+    </div>
+
     <!-- Chat messages -->
     <div class="border rounded p-2 bg-light">
       <div *ngFor="let m of agui.messages$ | async" class="mb-2">
