@@ -32,7 +32,7 @@
   </ng-container>
   <div class="col-12 d-flex justify-content-between align-items-center mt-2">
     <div class="text-muted" *ngIf="done">All fields collected from chat.</div>
-    <button *ngIf="allowSubmit" type="submit" class="btn btn-success" [disabled]="!form.valid">Submit</button>
+    <button *ngIf="allowSubmit" type="submit" class="btn btn-success" [disabled]="!form.valid">{{ schema?.submitLabel || 'Submit' }}</button>
   </div>
 </form>
 

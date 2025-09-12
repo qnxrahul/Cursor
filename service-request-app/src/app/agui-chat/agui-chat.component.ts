@@ -69,15 +69,33 @@ export class AguiChatComponent implements OnInit, OnDestroy {
 
     // If we previously asked for field specs, forward them to backend as a creation request
     if (this.awaitingFieldSpec) {
-      const prompt = `Create a dynamic form with these fields: ${t}`;
-      // Signal backend that schema is requested; form component will show submit after confirmation
-      this.agui.send(prompt);
-      this.awaitingFieldSpec = false;
-      // Allow submit once fields are provided to generate the form
-      const prev = this.agui.state$.value || {};
-      this.agui.state$.next({ ...prev, allow_submit: true });
-      this.input = '';
-      return;
+      // Try to parse locally and generate schema
+      const parsed = this.parseFormSpec(t);
+      if (parsed) {
+        const { schema, submitLabel, formType } = parsed as any;
+        const prev = this.agui.state$.value || {};
+        const next: any = { ...prev, schema, allow_submit: true };
+        if (formType) next.form_type = formType;
+        if (submitLabel) next.schema = { ...schema, submitLabel };
+        this.agui.state$.next(next);
+        const msgs = this.agui.messages$.value.slice();
+        msgs.push({ role: 'user', text: t });
+        msgs.push({ role: 'assistant', text: `Generated ${formType ? (formType.charAt(0).toUpperCase()+formType.slice(1)) : 'form'} with ${schema.fields.length} field(s).` });
+        this.agui.messages$.next(msgs);
+        this.awaitingFieldSpec = false;
+        this.optionsAllowed = false;
+        this.input = '';
+        return;
+      } else {
+        // Fallback to backend if parsing fails
+        const prompt = `Create a dynamic form with these fields: ${t}`;
+        this.agui.send(prompt);
+        this.awaitingFieldSpec = false;
+        const prev = this.agui.state$.value || {};
+        this.agui.state$.next({ ...prev, allow_submit: true });
+        this.input = '';
+        return;
+      }
     }
 
     // If input matches a known request, route to backend immediately
@@ -197,6 +215,171 @@ export class AguiChatComponent implements OnInit, OnDestroy {
     const intentHints = ['create', 'build', 'make', 'need', 'want', 'request', 'form'];
     if (intentHints.some(h => lower.includes(h))) return false;
     return true;
+  }
+
+  // -------- NL field spec parsing helpers --------
+  private parseFormSpec(input: string): { schema: any; submitLabel?: string; formType?: string } | null {
+    try {
+      const text = (input || '').trim();
+      if (!text) return null;
+      const lower = text.toLowerCase();
+
+      // Form type e.g., "policy form"
+      let formType: string | undefined;
+      const typeMatch = text.match(/([A-Za-z][A-Za-z\s]+?)\s+form/);
+      if (typeMatch && typeMatch[1]) {
+        formType = typeMatch[1].trim().toLowerCase();
+      }
+
+      // Submit label
+      let submitLabel: string | undefined;
+      const submitMatch = text.match(/submit\s+label\s+should\s+be\s+([A-Za-z][A-Za-z\s]+)/i);
+      if (submitMatch && submitMatch[1]) submitLabel = submitMatch[1].trim();
+
+      // Fallback: also detect quoted label
+      const quotedLabel = text.match(/submit\s+label\s+should\s+be\s+"([^"]+)"|'([^']+)'/i);
+      if (!submitLabel && quotedLabel) submitLabel = (quotedLabel[1] || quotedLabel[2] || '').trim();
+
+      // Split into clauses by punctuation
+      const clauses = text
+        .split(/(?<=[\.\!\?])\s+|\s*,\s*(?=[A-Za-z_\-]+\s*:\s*[A-Za-z])/)
+        .map(s => s.trim())
+        .filter(Boolean);
+
+      const fields: any[] = [];
+
+      for (const clause of clauses) {
+        const c = clause.trim();
+        if (!c) continue;
+
+        // CSV style: label:type or label:type[opt1,opt2]
+        const csvMatch = c.match(/^([A-Za-z][A-Za-z\s_\-]+)\s*:\s*([A-Za-z]+)(\[[^\]]+\])?$/);
+        if (csvMatch) {
+          const label = this.normalizeLabel(csvMatch[1]);
+          const type = csvMatch[2].toLowerCase();
+          const options = csvMatch[3] ? csvMatch[3].slice(1, -1).split(/\s*,\s*/).filter(Boolean) : undefined;
+          fields.push(this.buildField(label, type, { options }));
+          continue;
+        }
+
+        // Pattern: "<label> (required|optional)"
+        const reqMatch = c.match(/^([A-Za-z][A-Za-z\s_\-]+)\s*\((required|optional)\)/i);
+        if (reqMatch) {
+          const label = this.normalizeLabel(reqMatch[1]);
+          const required = reqMatch[2].toLowerCase() === 'required';
+          // Guess type by keywords
+          const guessedType = this.guessTypeFromLabel(c);
+          fields.push(this.buildField(label, guessedType, { required }));
+          continue;
+        }
+
+        // Pattern: "<label> as a <type> with <options>"
+        const asType = c.match(/^([A-Za-z][A-Za-z\s_\-]+)\s+as\s+a\s+([A-Za-z\s]+)(?:\s+with\s+(.+))?$/i);
+        if (asType) {
+          const label = this.normalizeLabel(asType[1]);
+          const typeRaw = asType[2].toLowerCase();
+          const type = this.normalizeType(typeRaw);
+          const options = asType[3] ? this.parseOptions(asType[3]) : undefined;
+          const required = /required/i.test(c);
+          fields.push(this.buildField(label, type, { options, required }));
+          continue;
+        }
+
+        // Pattern: dropdown/select having/with options
+        const dd = c.match(/^(dropdown|select)\s+(?:having|with)\s+(.+)$/i);
+        if (dd) {
+          const label = this.normalizeLabel('Select');
+          const options = this.parseOptions(dd[2]);
+          fields.push(this.buildField(label, 'select', { options }));
+          continue;
+        }
+
+        // Pattern: radios yes/no
+        if (/radio\s+yes\s*\/\s*no/i.test(c) || /radio\s+yes\s*\W\s*no/i.test(c)) {
+          const label = this.normalizeLabel(c.replace(/radio.*/i, '').trim() || 'Choice');
+          fields.push(this.buildField(label, 'radio', { options: ['Yes', 'No'] }));
+          continue;
+        }
+
+        // Dates explicitly mentioned
+        if (/date\s+required/i.test(c) || /\bdate\b/i.test(c)) {
+          const label = this.normalizeLabel(c.replace(/\bdate\b.*/i, '').trim() || 'Date');
+          const required = /required/i.test(c);
+          fields.push(this.buildField(label, 'date', { required }));
+          continue;
+        }
+
+        // Fallback guess from words like email, textarea, number, text field
+        const guessedType = this.guessTypeFromLabel(c);
+        if (guessedType) {
+          const label = this.normalizeLabel(c.replace(/\(.*?\)/g, '').trim());
+          const required = /required/i.test(c);
+          const optional = /optional/i.test(c);
+          fields.push(this.buildField(label, guessedType, { required: optional ? false : required }));
+          continue;
+        }
+      }
+
+      if (fields.length === 0) return null;
+
+      const schema = { fields } as any;
+      if (submitLabel) schema.submitLabel = submitLabel;
+      return { schema, submitLabel, formType };
+    } catch {
+      return null;
+    }
+  }
+
+  private normalizeLabel(raw: string): string {
+    return (raw || '').replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim().replace(/\b\w/g, c => c.toUpperCase());
+  }
+
+  private keyFromLabel(label: string): string {
+    return (label || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, '')
+      .trim()
+      .replace(/\s+/g, '_');
+  }
+
+  private normalizeType(typeRaw: string): string {
+    const t = (typeRaw || '').toLowerCase().trim();
+    if (t.includes('text area') || t.includes('textarea')) return 'textarea';
+    if (t.includes('text field') || t === 'text') return 'text';
+    if (t.includes('email')) return 'email';
+    if (t.includes('number')) return 'number';
+    if (t.includes('date')) return 'date';
+    if (t.includes('select') || t.includes('dropdown')) return 'select';
+    if (t.includes('radio')) return 'radio';
+    if (t.includes('checkbox')) return 'checkbox';
+    return 'text';
+  }
+
+  private parseOptions(s: string): string[] {
+    const inside = s.match(/\[([^\]]+)\]/);
+    const raw = inside ? inside[1] : s;
+    return raw.split(/\s*[,\/]\s*/).map(x => x.trim()).filter(Boolean).map(x => this.normalizeLabel(x));
+  }
+
+  private guessTypeFromLabel(s: string): string {
+    const l = s.toLowerCase();
+    if (l.includes('email')) return 'email';
+    if (l.includes('date')) return 'date';
+    if (l.includes('number')) return 'number';
+    if (l.includes('textarea') || l.includes('text area')) return 'textarea';
+    if (l.includes('select') || l.includes('dropdown')) return 'select';
+    if (l.includes('radio')) return 'radio';
+    if (l.includes('checkbox')) return 'checkbox';
+    if (l.includes('text field')) return 'text';
+    return 'text';
+  }
+
+  private buildField(label: string, type: string, opts?: { required?: boolean; options?: string[] }): any {
+    const key = this.keyFromLabel(label);
+    const field: any = { key, label, type: type.toLowerCase() };
+    if (typeof opts?.required === 'boolean') field.required = opts.required;
+    if (Array.isArray(opts?.options) && (type === 'select' || type === 'radio' || type === 'checkbox')) field.options = opts.options;
+    return field;
   }
 }
 
