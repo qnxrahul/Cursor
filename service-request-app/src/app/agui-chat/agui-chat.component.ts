@@ -220,7 +220,9 @@ export class AguiChatComponent implements OnInit, OnDestroy {
   // -------- NL field spec parsing helpers --------
   private parseFormSpec(input: string): { schema: any; submitLabel?: string; formType?: string } | null {
     try {
-      const text = (input || '').trim();
+      let text = (input || '').trim();
+      // Normalize curly quotes/dashes
+      text = text.replace(/[“”]/g, '"').replace(/[’]/g, "'").replace(/[–—]/g, '-');
       if (!text) return null;
       const lower = text.toLowerCase();
 
@@ -242,7 +244,7 @@ export class AguiChatComponent implements OnInit, OnDestroy {
 
       // Split into clauses by punctuation
       const clauses = text
-        .split(/(?<=[\.\!\?])\s+|\s*,\s*(?=[A-Za-z_\-]+\s*:\s*[A-Za-z])/)
+        .split(/(?<=[\.!\?])\s+|\s*,\s*(?=[A-Za-z_\-]+\s*:\s*[A-Za-z])/)
         .map(s => s.trim())
         .filter(Boolean);
 
@@ -262,6 +264,16 @@ export class AguiChatComponent implements OnInit, OnDestroy {
           continue;
         }
 
+        // Compound: "X and Y required"
+        const bothReq = c.match(/^([A-Za-z][A-Za-z\s_\-]+)\s+and\s+([A-Za-z][A-Za-z\s_\-]+)\s+required/i);
+        if (bothReq) {
+          const a = this.normalizeLabel(bothReq[1]);
+          const b = this.normalizeLabel(bothReq[2]);
+          fields.push(this.buildField(a, this.guessTypeFromLabel(a), { required: true }));
+          fields.push(this.buildField(b, this.guessTypeFromLabel(b), { required: true }));
+          continue;
+        }
+
         // Pattern: "<label> (required|optional)"
         const reqMatch = c.match(/^([A-Za-z][A-Za-z\s_\-]+)\s*\((required|optional)\)/i);
         if (reqMatch) {
@@ -273,24 +285,32 @@ export class AguiChatComponent implements OnInit, OnDestroy {
           continue;
         }
 
-        // Pattern: "<label> as a <type> with <options>"
-        const asType = c.match(/^([A-Za-z][A-Za-z\s_\-]+)\s+as\s+a\s+([A-Za-z\s]+)(?:\s+with\s+(.+))?$/i);
+        // Pattern: "<label> as a/an <type> with <options>" or without options
+        const asType = c.match(/^([A-Za-z][A-Za-z\s_\-]+)\s+as\s+(?:a\s+|an\s+)?([A-Za-z\s]+?)(?:\s+with\s+(.+))?$/i);
         if (asType) {
           const label = this.normalizeLabel(asType[1]);
           const typeRaw = asType[2].toLowerCase();
           const type = this.normalizeType(typeRaw);
           const options = asType[3] ? this.parseOptions(asType[3]) : undefined;
-          const required = /required/i.test(c);
+          const required = /required/i.test(c) && !/optional/i.test(c);
           fields.push(this.buildField(label, type, { options, required }));
           continue;
         }
 
-        // Pattern: dropdown/select having/with options
+        // Pattern: "<label> dropdown/select having/with <options>"
+        const dd2 = c.match(/^([A-Za-z][A-Za-z\s_\-]+)\s+(dropdown|select)\s+(?:having|with)\s+(.+)$/i);
+        if (dd2) {
+          const label = this.normalizeLabel(dd2[1]);
+          const options = this.parseOptions(dd2[3]);
+          fields.push(this.buildField(label, 'select', { options }));
+          continue;
+        }
+        // Pattern: dropdown/select having/with options (no explicit label)
         const dd = c.match(/^(dropdown|select)\s+(?:having|with)\s+(.+)$/i);
         if (dd) {
-          const label = this.normalizeLabel('Select');
-          const options = this.parseOptions(dd[2]);
-          fields.push(this.buildField(label, 'select', { options }));
+          const opts = this.parseOptions(dd[2]);
+          const label = this.normalizeLabel((dd[2].match(/^[A-Za-z\s]+/) || ['Select'])[0]);
+          fields.push(this.buildField(label, 'select', { options: opts }));
           continue;
         }
 
@@ -358,7 +378,12 @@ export class AguiChatComponent implements OnInit, OnDestroy {
   private parseOptions(s: string): string[] {
     const inside = s.match(/\[([^\]]+)\]/);
     const raw = inside ? inside[1] : s;
-    return raw.split(/\s*[,\/]\s*/).map(x => x.trim()).filter(Boolean).map(x => this.normalizeLabel(x));
+    return raw
+      .replace(/^(pending|approved|yes|no)\b/gi, (m) => m) // keep common tokens
+      .split(/\s*[,\/]|\s+and\s+|\s+or\s+/i)
+      .map(x => x.trim())
+      .filter(Boolean)
+      .map(x => this.normalizeLabel(x));
   }
 
   private guessTypeFromLabel(s: string): string {
