@@ -40,6 +40,7 @@ export class AguiChatComponent implements OnInit, OnDestroy {
     const t = this.input.trim();
     if (!t) return;
     this.hasUserResponded = true;
+    const lower = t.toLowerCase();
 
     // Handle outstanding yes/no prompt
     if (this.awaitingYesNo) {
@@ -76,14 +77,21 @@ export class AguiChatComponent implements OnInit, OnDestroy {
       return;
     }
 
-    // Detect intent to create a new form type and prompt for field details
-    const lower = t.toLowerCase();
-    const asksNewForm = lower.includes('new type of form') || lower.includes('create a dynamic form') || lower.includes('new form');
+    // If input matches a known request, route to backend immediately
+    const reqKeyEarly = this.parseRequestKey(lower);
+    if (reqKeyEarly) {
+      this.agui.send(reqKeyEarly);
+      this.input = '';
+      return;
+    }
+
+    // Detect intent to create a new custom form (e.g., "I need policy form")
+    const asksNewForm = this.isDynamicFormIntent(lower);
     if (asksNewForm) {
       // Append user's message and assistant guidance locally without hitting backend yet
       const msgs = this.agui.messages$.value.slice();
       msgs.push({ role: 'user', text: t });
-      msgs.push({ role: 'assistant', text: 'Sure — please share the field names and types (e.g., text, number, date, radio, checkbox, select, textarea). For example: name:text, age:number, start_date:date, department:select[HR,Finance,IT].' });
+      msgs.push({ role: 'assistant', text: 'Sure — what fields do you want to add and any CSS preferences (primary, accent, card background, text color, corner radius, font)? For example: name:text, age:number, start_date:date, department:select[HR,Finance,IT].' });
       this.agui.messages$.next(msgs);
       this.awaitingFieldSpec = true;
       this.input = '';
@@ -94,14 +102,6 @@ export class AguiChatComponent implements OnInit, OnDestroy {
     if (lower.includes('generate form')) {
       const prev = this.agui.state$.value || {};
       this.agui.state$.next({ ...prev, allow_submit: true });
-    }
-
-    // If input matches a known request, route to backend
-    const reqKey = this.parseRequestKey(lower);
-    if (reqKey) {
-      this.agui.send(reqKey);
-      this.input = '';
-      return;
     }
 
     // Out-of-scope: apologize and ask yes/no to continue
@@ -159,6 +159,14 @@ export class AguiChatComponent implements OnInit, OnDestroy {
       if (m.hints.some(h => lower.includes(h))) return m.key;
     }
     return null;
+  }
+
+  private isDynamicFormIntent(lower: string): boolean {
+    if (lower.includes('dynamic form') || lower.includes('new type of form') || lower.includes('new form')) return true;
+    if (/(create|build|make|need|want|design|generate)\s+.*\sform/.test(lower)) return true;
+    if (/(^|\s)form for\s+.+/.test(lower)) return true;
+    if (/\b\w+\s+form\b/.test(lower)) return true; // e.g., "policy form"
+    return false;
   }
 }
 
