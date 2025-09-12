@@ -37,17 +37,9 @@
       </div>
     </div>
 
-    <!-- Inline dynamic form field spec capture -->
-    <div *ngIf="collectFieldSpecs" class="mt-2">
-      <label class="form-label small text-muted">Enter field names and types, then Generate</label>
-      <div class="input-group">
-        <input [(ngModel)]="fieldSpecText" class="form-control" placeholder="e.g., name:text, age:number, start_date:date, department:select[HR,Finance,IT]" />
-        <button class="btn btn-success" (click)="confirmFieldSpecs()">Generate</button>
-      </div>
-    </div>
   </div>
   <div class="input-group">
-    <input [(ngModel)]="input" (keyup.enter)="send()" class="form-control" placeholder="Type your answer..." />
+    <input [(ngModel)]="input" (keyup.enter)="send()" class="form-control" [placeholder]="awaitingFieldSpec ? 'Enter fields and types, e.g., name:text, age:number, start_date:date' : 'Type your answer...'" />
   </div>
 </div>
 

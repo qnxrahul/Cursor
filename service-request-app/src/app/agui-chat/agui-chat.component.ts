@@ -11,9 +11,7 @@ export class AguiChatComponent implements OnInit, OnDestroy {
   state: any = {};
   private sub?: Subscription;
   showCustomizer = false;
-  private awaitingFieldSpec = false;
-  collectFieldSpecs = false;
-  fieldSpecText = '';
+  awaitingFieldSpec = false;
   // Known requests (should mirror backend manifest keys)
   requests = [
     { key: 'service_auth', label: 'Service Authorization Request' },
@@ -73,11 +71,11 @@ export class AguiChatComponent implements OnInit, OnDestroy {
 
   choose(key: string) {
     if (key === '__new_form__') {
-      this.collectFieldSpecs = true;
-      // Provide guidance message in chat stream
+      // Guide user to type specs into the main prompt box
       const msgs = this.agui.messages$.value.slice();
       msgs.push({ role: 'assistant', text: 'Please share the field names and types (e.g., name:text, age:number, start_date:date, department:select[HR,Finance,IT]).' });
       this.agui.messages$.next(msgs);
+      this.awaitingFieldSpec = true;
       return;
     }
     this.agui.send(key);
@@ -96,17 +94,6 @@ export class AguiChatComponent implements OnInit, OnDestroy {
     const prev = this.agui.state$.value || {};
     const next = { ...prev, form: {} };
     this.agui.state$.next(next);
-  }
-
-  confirmFieldSpecs() {
-    const spec = (this.fieldSpecText || '').trim();
-    if (!spec) return;
-    const prompt = `Create a dynamic form with these fields: ${spec}`;
-    this.agui.send(prompt);
-    const prev = this.agui.state$.value || {};
-    this.agui.state$.next({ ...prev, allow_submit: true });
-    this.collectFieldSpecs = false;
-    this.fieldSpecText = '';
   }
 
   private isIntroText(text: string): boolean {
