@@ -12,7 +12,8 @@ export class AguiChatComponent implements OnInit, OnDestroy {
   private sub?: Subscription;
   showCustomizer = false;
   awaitingFieldSpec = false;
-  greeted = false;
+  hasUserResponded = false;
+  userDeclined = false;
   // Known requests (should mirror backend manifest keys)
   requests = [
     { key: 'service_auth', label: 'Service Authorization Request' },
@@ -25,6 +26,11 @@ export class AguiChatComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.sub = this.agui.state$.subscribe(s => { this.state = s || {}; });
+    // Seed initial assistant greeting if no messages yet
+    const existing = this.agui.messages$.value || [];
+    if (existing.length === 0) {
+      this.agui.messages$.next([{ role: 'assistant', text: 'Hi, how may I help you?' }]);
+    }
   }
 
   ngOnDestroy(): void { this.sub?.unsubscribe(); }
@@ -32,14 +38,15 @@ export class AguiChatComponent implements OnInit, OnDestroy {
   send() {
     const t = this.input.trim();
     if (!t) return;
+    this.hasUserResponded = true;
 
-    // Handle greeting flow: first user greets -> assistant replies and shows options
-    if (!this.greeted && this.isGreeting(t)) {
+    // If user declines creating requests
+    if (this.isDecline(t)) {
       const msgs = this.agui.messages$.value.slice();
       msgs.push({ role: 'user', text: t });
-      msgs.push({ role: 'assistant', text: 'Hi, how may I help you?' });
+      msgs.push({ role: 'assistant', text: 'I am limited to creating different IT service requests and dynamic form generation.' });
       this.agui.messages$.next(msgs);
-      this.greeted = true;
+      this.userDeclined = true;
       this.input = '';
       return;
     }
@@ -87,7 +94,7 @@ export class AguiChatComponent implements OnInit, OnDestroy {
 
   get showWelcome(): boolean {
     // Show welcome chooser if no schema chosen yet
-    return !this.state?.schema && this.greeted;
+    return !this.state?.schema && this.hasUserResponded && !this.userDeclined;
   }
 
   toggleCustomizer() {
@@ -110,10 +117,9 @@ export class AguiChatComponent implements OnInit, OnDestroy {
            t.includes("bonafide certificate");
   }
 
-  private isGreeting(text: string): boolean {
-    const s = (text || '').trim().toLowerCase();
-    const tokens = ["hi", "hello", "hey", "good morning", "good afternoon", "good evening"];
-    return tokens.some(k => s === k || s.startsWith(k + ' ') || s.endsWith(' ' + k) || s.includes(' ' + k + ' '));
+  private isDecline(text: string): boolean {
+    const s = (text || '').toLowerCase();
+    return s.includes("don't create") || s.includes("do not create") || s.includes("no request") || s.includes("no requests") || s.includes("not create any request") || s.includes("no, thanks") || s.includes("no thanks");
   }
 }
 
