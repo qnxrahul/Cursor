@@ -403,8 +403,8 @@ def build_form_agent_graph():
                 msub_global = re.search(r"submit\s*label\s*(?:should\s*be|is|:)?\s*([^\.,;\n]+)", desc, flags=re.IGNORECASE)
                 if msub_global:
                     submit_label = msub_global.group(1).strip().strip("'\"` ").title()
-                # split description into chunks by ',', ' and '
-                raw_chunks = re.split(r"\s*(?:,|\band\b)\s+", desc, flags=re.IGNORECASE)
+                # split description into chunks by ',', 'and', newlines, semicolons, periods
+                raw_chunks = re.split(r"\s*(?:,|\band\b|\n|;|\.)\s+", desc, flags=re.IGNORECASE)
                 for chunk in raw_chunks:
                     s = chunk.strip()
                     if not s:
@@ -417,21 +417,40 @@ def build_form_agent_graph():
                     ftype = "text"
                     options: List[str] = []
                     required = ("required" in low) or ("must" in low and "optional" not in low)
-                    if re.search(r"\bemail\b", low):
-                        ftype = "email"
-                    elif re.search(r"\bnumber\b|amount|total|quantity", low):
-                        ftype = "number"
-                    elif re.search(r"\bdate\b|last working day|fiscal year", low):
-                        # if fiscal year dropdown later, we may override options
-                        ftype = "date"
-                    elif re.search(r"\btext\s*area\b|comments|description", low):
-                        ftype = "textarea"
-                    elif re.search(r"\bselect\b|\bdropdown\b", low):
-                        ftype = "select"
-                    elif re.search(r"\bradio\b", low):
-                        ftype = "radio"
-                    elif re.search(r"\bcheckbox\b|check\s*boxes", low):
-                        ftype = "checkbox"
+
+                    # check for explicit metadata in parentheses
+                    meta = None
+                    mpar = re.search(r"\(([^)]*)\)", s)
+                    if mpar:
+                        meta = mpar.group(1).strip().lower()
+                        if "email" in meta:
+                            ftype = "email"
+                        elif "number" in meta:
+                            ftype = "number"
+                        elif "date" in meta or "date picker" in meta:
+                            ftype = "date"
+                        elif "text area" in meta or "textarea" in meta or "multiline" in meta:
+                            ftype = "textarea"
+                        elif "password" in meta:
+                            ftype = "password"
+                        elif "tel" in meta or "phone" in meta:
+                            ftype = "tel"
+                        elif "select" in meta or "dropdown" in meta:
+                            ftype = "select"
+                        elif "radio" in meta:
+                            ftype = "radio"
+                        elif "checkbox" in meta:
+                            ftype = "checkbox"
+                        if "required" in meta:
+                            required = True
+                        if "optional" in meta:
+                            required = False
+
+                        # Options inside metadata like 'dropdown: Savings, Current'
+                        mopts2 = re.search(r"(?:dropdown|select)\s*:\s*([^)]+)", meta)
+                        if mopts2:
+                            raw = mopts2.group(1)
+                            options = [o.strip() for o in re.split(r",|/|\bor\b", raw) if o.strip()]
 
                     # parse options
                     if ftype in ("select", "radio", "checkbox"):
@@ -452,7 +471,8 @@ def build_form_agent_graph():
                             options = [f"FY{y-1}-{y}", f"FY{y}-{y+1}", f"FY{y+1}-{y+2}"]
 
                     # derive label and key
-                    label = clean_label(s)
+                    label_src = s.split("(")[0] if "(" in s else s
+                    label = clean_label(label_src)
                     key = snake_key(label)
                     field: Dict[str, Any] = {"key": key, "label": label, "type": ftype, "required": required}
                     if options:
