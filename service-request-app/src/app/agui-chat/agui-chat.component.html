@@ -4,8 +4,6 @@
     <div *ngIf="showWelcome" class="mb-3">
       <div class="card" style="border-radius: var(--app-radius);">
         <div class="card-body" style="background: var(--app-card-bg); color: var(--app-text); font-family: var(--app-font);">
-          <h5 class="mb-2">Hi, I'm HelpDesk Assistant</h5>
-          <p class="mb-3">I can help you create and submit IT helpdesk related requests. Choose one to begin, or describe a new request and I'll build it.</p>
           <div class="d-flex flex-wrap gap-2">
             <button class="btn btn-sm btn-outline-primary" *ngFor="let r of requests" (click)="choose(r.key)">{{ r.label }}</button>
           </div>

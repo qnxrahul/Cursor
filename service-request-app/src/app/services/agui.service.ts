@@ -103,7 +103,15 @@ export class AguiService {
         if (msgsNow.length > 0) {
           const last = msgsNow[msgsNow.length - 1];
           if (last.role === 'assistant') {
-            last.text += e.delta || '';
+            const delta = String(e.delta || '');
+            // Suppress canned intro text from server
+            const lowered = delta.toLowerCase();
+            const isIntroChunk = lowered.includes("helpdesk assistant") ||
+                                 lowered.includes("here are some requests i can create") ||
+                                 lowered.includes("tell me which one you want");
+            if (!isIntroChunk) {
+              last.text += delta;
+            }
             this.lastAssistantText = last.text || null;
           }
           this.messages$.next(msgsNow);
@@ -139,8 +147,12 @@ export class AguiService {
             const role = t === 'human' ? 'user' : t === 'ai' ? 'assistant' : null as any;
             if (role === 'assistant') {
               const norm = String(content || '').trim();
+              const normLower = norm.toLowerCase();
+              const intro = normLower.includes("helpdesk assistant") ||
+                            normLower.includes("here are some requests i can create") ||
+                            normLower.includes("tell me which one you want");
               const hash = `${role}:${norm}`;
-              if (this.lastSnapshotHash !== hash) {
+              if (!intro && this.lastSnapshotHash !== hash) {
                 const current = this.messages$.value;
                 const lastMsg = current[current.length - 1];
                 if (!(lastMsg && lastMsg.role === role && lastMsg.text.trim() === norm)) {
@@ -164,8 +176,12 @@ export class AguiService {
           const text = last?.content ?? '';
           if (role === 'assistant') {
             const norm = String(text || '').trim();
+            const normLower = norm.toLowerCase();
+            const intro = normLower.includes("helpdesk assistant") ||
+                          normLower.includes("here are some requests i can create") ||
+                          normLower.includes("tell me which one you want");
             const hash = `${role}:${norm}`;
-            if (this.lastSnapshotHash !== hash) {
+            if (!intro && this.lastSnapshotHash !== hash) {
               const current = this.messages$.value;
               const lastMsg = current[current.length - 1];
               if (!(lastMsg && lastMsg.role === role && lastMsg.text.trim() === norm)) {
