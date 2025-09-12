@@ -4,10 +4,9 @@
     <div *ngIf="showWelcome" class="mb-3">
       <div class="card" style="border-radius: var(--app-radius);">
         <div class="card-body" style="background: var(--app-card-bg); color: var(--app-text); font-family: var(--app-font);">
-          <p class="mb-3">Hi, I'm HelpDesk Assistant. I can help you create and submit IT helpdesk related requests. Here are some requests I can create right away, or you can instruct me to create a dynamic form for you.</p>
+          <p class="mb-3">I can help you create and submit IT helpdesk related requests. Here are some requests I can create right away, or you can describe a new form.</p>
           <div class="d-flex flex-wrap gap-2">
             <button class="btn btn-sm btn-outline-primary" *ngFor="let r of requests" (click)="choose(r.key)">{{ r.label }}</button>
-            <button class="btn btn-sm btn-primary" (click)="choose('__new_form__')">Create Dynamic Form</button>
           </div>
         </div>
       </div>

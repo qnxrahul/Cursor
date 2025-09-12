@@ -12,6 +12,7 @@ export class AguiChatComponent implements OnInit, OnDestroy {
   private sub?: Subscription;
   showCustomizer = false;
   awaitingFieldSpec = false;
+  greeted = false;
   // Known requests (should mirror backend manifest keys)
   requests = [
     { key: 'service_auth', label: 'Service Authorization Request' },
@@ -31,6 +32,17 @@ export class AguiChatComponent implements OnInit, OnDestroy {
   send() {
     const t = this.input.trim();
     if (!t) return;
+
+    // Handle greeting flow: first user greets -> assistant replies and shows options
+    if (!this.greeted && this.isGreeting(t)) {
+      const msgs = this.agui.messages$.value.slice();
+      msgs.push({ role: 'user', text: t });
+      msgs.push({ role: 'assistant', text: 'Hi, how may I help you?' });
+      this.agui.messages$.next(msgs);
+      this.greeted = true;
+      this.input = '';
+      return;
+    }
 
     // If we previously asked for field specs, forward them to backend as a creation request
     if (this.awaitingFieldSpec) {
@@ -70,20 +82,12 @@ export class AguiChatComponent implements OnInit, OnDestroy {
   }
 
   choose(key: string) {
-    if (key === '__new_form__') {
-      // Guide user to type specs into the main prompt box
-      const msgs = this.agui.messages$.value.slice();
-      msgs.push({ role: 'assistant', text: 'Please share the field names and types (e.g., name:text, age:number, start_date:date, department:select[HR,Finance,IT]).' });
-      this.agui.messages$.next(msgs);
-      this.awaitingFieldSpec = true;
-      return;
-    }
     this.agui.send(key);
   }
 
   get showWelcome(): boolean {
     // Show welcome chooser if no schema chosen yet
-    return !this.state?.schema;
+    return !this.state?.schema && this.greeted;
   }
 
   toggleCustomizer() {
@@ -104,6 +108,12 @@ export class AguiChatComponent implements OnInit, OnDestroy {
            t.includes("exit request") ||
            t.includes("reimbursement") ||
            t.includes("bonafide certificate");
+  }
+
+  private isGreeting(text: string): boolean {
+    const s = (text || '').trim().toLowerCase();
+    const tokens = ["hi", "hello", "hey", "good morning", "good afternoon", "good evening"];
+    return tokens.some(k => s === k || s.startsWith(k + ' ') || s.endsWith(' ' + k) || s.includes(' ' + k + ' '));
   }
 }
 
