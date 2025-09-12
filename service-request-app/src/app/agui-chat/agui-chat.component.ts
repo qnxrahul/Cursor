@@ -97,15 +97,7 @@ export class AguiChatComponent implements OnInit, OnDestroy {
     return !this.state?.schema && this.hasUserResponded && !this.userDeclined;
   }
 
-  toggleCustomizer() {
-    this.showCustomizer = !this.showCustomizer;
-  }
-
-  clearFields() {
-    const prev = this.agui.state$.value || {};
-    const next = { ...prev, form: {} };
-    this.agui.state$.next(next);
-  }
+  // customization and clear fields actions removed per request
 
   private isIntroText(text: string): boolean {
     const t = (text || '').toLowerCase();
