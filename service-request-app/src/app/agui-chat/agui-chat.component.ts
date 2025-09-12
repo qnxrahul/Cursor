@@ -260,17 +260,28 @@ export class AguiChatComponent implements OnInit, OnDestroy {
       const quotedLabel = text.match(/submit\s+label\s+should\s+be\s+"([^"]+)"|'([^']+)'/i);
       if (!submitLabel && quotedLabel) submitLabel = (quotedLabel[1] || quotedLabel[2] || '').trim();
 
-      // Split into clauses by punctuation
+      // Remove submit label phrase from text so it doesn't get parsed as a field
+      text = text.replace(/submit\s+label\s+should\s+be[^\.\n]*[\.|\n]?/gi, ' ');
+      // Remove leading "<type> form:" prefix if present
+      text = text.replace(/^[\s\"']*[A-Za-z][A-Za-z\s]+?\s+form\s*:\s*/i, '');
+
+      // Split into clauses by sentences, semicolons, and general commas
       const clauses = text
-        .split(/(?<=[\.!\?])\s+|\s*,\s*(?=[A-Za-z_\-]+\s*:\s*[A-Za-z])/)
+        .split(/(?<=[\.!\?])\s+|\s*;\s*|\s*,\s*/)
         .map(s => s.trim())
         .filter(Boolean);
 
       const fields: any[] = [];
 
       for (const clause of clauses) {
-        const c = clause.trim();
+        let c = clause.trim();
         if (!c) continue;
+        // Skip if this clause is about submit label
+        if (/^submit\s+label\s+should\s+be/i.test(c)) continue;
+        // Remove any surrounding quotes
+        c = c.replace(/^\"|\"$/g, '').trim();
+        // Remove redundant prefix like "Policy form:"
+        c = c.replace(/^[A-Za-z][A-Za-z\s]+?\s+form\s*:\s*/i, '');
 
         // CSV style: label:type or label:type[opt1,opt2]
         const csvMatch = c.match(/^([A-Za-z][A-Za-z\s_\-]+)\s*:\s*([A-Za-z]+)(\[[^\]]+\])?$/);
