@@ -15,6 +15,7 @@ export class AguiChatComponent implements OnInit, OnDestroy {
   hasUserResponded = false;
   userDeclined = false;
   awaitingYesNo = false;
+  optionsAllowed = false;
   // Known requests (should mirror backend manifest keys)
   requests = [
     { key: 'service_auth', label: 'Service Authorization Request' },
@@ -52,10 +53,12 @@ export class AguiChatComponent implements OnInit, OnDestroy {
         msgs.push({ role: 'assistant', text: 'Great — please choose a request below or describe a new form.' });
         this.awaitingYesNo = false;
         this.userDeclined = false;
+        this.optionsAllowed = true;
       } else if (negative) {
         msgs.push({ role: 'assistant', text: 'I am limited to creating different IT service requests and dynamic form generation.' });
         this.awaitingYesNo = false;
         this.userDeclined = true;
+        this.optionsAllowed = false;
       } else {
         msgs.push({ role: 'assistant', text: "Please reply 'yes' to continue or 'no' to cancel." });
       }
@@ -81,6 +84,7 @@ export class AguiChatComponent implements OnInit, OnDestroy {
     const reqKeyEarly = this.parseRequestKey(lower);
     if (reqKeyEarly) {
       this.agui.send(reqKeyEarly);
+      this.optionsAllowed = false;
       this.input = '';
       return;
     }
@@ -94,6 +98,7 @@ export class AguiChatComponent implements OnInit, OnDestroy {
       msgs.push({ role: 'assistant', text: 'Sure — what fields do you want to add and any CSS preferences (primary, accent, card background, text color, corner radius, font)? For example: name:text, age:number, start_date:date, department:select[HR,Finance,IT].' });
       this.agui.messages$.next(msgs);
       this.awaitingFieldSpec = true;
+      this.optionsAllowed = false;
       this.input = '';
       return;
     }
@@ -121,6 +126,7 @@ export class AguiChatComponent implements OnInit, OnDestroy {
     msgs.push({ role: 'assistant', text: "Hi, I'm HelpDesk Assistant. Sorry, I can help you create and submit IT helpdesk related requests. Here are some requests I can create right away, or you can instruct me to create a dynamic form for you. Say 'yes' or 'no' to continue." });
     this.agui.messages$.next(msgs);
     this.awaitingYesNo = true;
+    this.optionsAllowed = false;
     this.input = '';
     return;
 
@@ -134,7 +140,7 @@ export class AguiChatComponent implements OnInit, OnDestroy {
 
   get showWelcome(): boolean {
     // Show welcome chooser if no schema chosen yet
-    return !this.state?.schema && this.hasUserResponded && !this.userDeclined && !this.awaitingYesNo;
+    return !this.state?.schema && this.optionsAllowed && !this.awaitingYesNo && !this.awaitingFieldSpec && !this.userDeclined;
   }
 
   // customization and clear fields actions removed per request
