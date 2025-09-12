@@ -35,8 +35,12 @@ export class AguiChatComponent implements OnInit, OnDestroy {
     // If we previously asked for field specs, forward them to backend as a creation request
     if (this.awaitingFieldSpec) {
       const prompt = `Create a dynamic form with these fields: ${t}`;
+      // Signal backend that schema is requested; form component will show submit after confirmation
       this.agui.send(prompt);
       this.awaitingFieldSpec = false;
+      // Allow submit once fields are provided to generate the form
+      const prev = this.agui.state$.value || {};
+      this.agui.state$.next({ ...prev, allow_submit: true });
       this.input = '';
       return;
     }
@@ -53,6 +57,12 @@ export class AguiChatComponent implements OnInit, OnDestroy {
       this.awaitingFieldSpec = true;
       this.input = '';
       return;
+    }
+
+    // If user explicitly asks to generate the form, enable submit
+    if (lower.includes('generate form')) {
+      const prev = this.agui.state$.value || {};
+      this.agui.state$.next({ ...prev, allow_submit: true });
     }
 
     this.agui.send(t);
