@@ -185,12 +185,12 @@ export class AguiChatComponent implements OnInit, OnDestroy {
 
   private isAffirmative(text: string): boolean {
     const s = (text || '').trim().toLowerCase();
-    return s === 'yes' || s === 'y' || s.startsWith('yes ') || s.includes(' yes') || s === 'sure' || s.startsWith('sure');
+    return /^\s*(yes|y|sure)\s*[\.!?]*\s*$/.test(s);
   }
 
   private isNegative(text: string): boolean {
     const s = (text || '').trim().toLowerCase();
-    return s === 'no' || s === 'n' || s.startsWith('no ') || s.includes(' no') || s.includes("don't") || s.includes('do not');
+    return /^\s*(no|n)\s*[\.!?]*\s*$/.test(s);
   }
   private isSpecOrChange(lower: string): boolean {
     // Heuristics to decide if user typed fields/options/theme changes
