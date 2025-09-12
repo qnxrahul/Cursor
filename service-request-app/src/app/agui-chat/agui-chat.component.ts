@@ -94,9 +94,11 @@ export class AguiChatComponent implements OnInit, OnDestroy {
       // Always send to AI; only wrap with update/create if it looks like a spec
       const hasSchema = !!this.state?.schema;
       const looksLikeSpec = this.isSpecOrChange(lower);
+      const parsed = this.parseFormSpec(t);
+      const schemaHint = parsed ? ` Parsed fields: ${parsed.schema.fields.map((f: any) => `${f.label}:${f.type}${f.required?'*':''}${f.options? '['+f.options.join(', ')+']':''}`).join('; ')}${parsed.schema.submitLabel?'. Submit label: '+parsed.schema.submitLabel:''}.` : '';
       const prompt = hasSchema
-        ? (looksLikeSpec ? `Update the current form by adding these fields and CSS preferences: ${t}` : t)
-        : (looksLikeSpec ? `Create a dynamic form with these fields and CSS preferences: ${t}` : t);
+        ? (looksLikeSpec ? `Update the current form by adding these fields and CSS preferences: ${t}.${schemaHint}` : t)
+        : (looksLikeSpec ? `Create a dynamic form with these fields and CSS preferences: ${t}.${schemaHint}` : t);
       this.agui.send(prompt);
       // Keep awaiting spec so user can add more
       const prev = this.agui.state$.value || {};
