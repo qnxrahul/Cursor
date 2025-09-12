@@ -14,7 +14,6 @@
 
     <!-- Action bar after selection -->
     <div *ngIf="!showWelcome" class="d-flex align-items-center gap-2 mb-3">
-      <span class="text-muted small">Tip: Use Customize theme to update CSS variables.</span>
       <button class="btn btn-outline-secondary btn-sm" (click)="clearFields()">Clear fields</button>
       <button class="btn btn-outline-primary btn-sm" (click)="toggleCustomizer()">{{ showCustomizer ? 'Close' : 'Customize theme' }}</button>
     </div>
