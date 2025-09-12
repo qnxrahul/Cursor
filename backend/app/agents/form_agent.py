@@ -118,16 +118,23 @@ def build_form_agent_graph():
             services_list = []
             try:
                 for key, val in forms_manifest.items():
-                    title = val.get("title") or key.replace("_", " ").title()
-                    services_list.append(f"- {title} ({key})")
+                    title = (val.get("title") or key.replace("_", " ").title())
+                    # Show as Request per requirement
+                    title_req = title.replace("Form", "Request")
+                    services_list.append(f"- {title_req} ({key})")
             except Exception:
                 services_list = []
-            services_text = "\n".join(services_list) if services_list else "- Service Authorization (service_auth)\n- Exit Request (exit_request)\n- Reimbursement (reimbursement)\n- Bonafide Certificate (bonafide_certificate)"
+            services_text = "\n".join(services_list) if services_list else (
+                "- Service Authorization Request (service_auth)\n"
+                "- Exit Request Request (exit_request)\n"
+                "- Reimbursement Request (reimbursement)\n"
+                "- Bonafide Certificate Request (bonafide_certificate)"
+            )
             greet = (
-                "Hi, I'm HelpDesk Assistant. I can help you create and submit forms.\n\n"
-                "Here are some forms I can create right away:\n"
+                "Hi, I'm HelpDesk Assistant. I can help you create and submit IT helpdesk related requests.\n\n"
+                "Here are some requests I can create right away:\n"
                 f"{services_text}\n\n"
-                "Tell me which one you want (e.g., 'reimbursement') or describe a new form (e.g., 'create a policy form'), and I'll build it for you."
+                "Tell me which one you want (e.g., 'reimbursement request') or describe a new form (e.g., 'create a policy request UI'), and I'll build it for you."
             )
             return {"messages": [AIMessage(content=greet)], "greeted": True}
 
