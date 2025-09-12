@@ -76,6 +76,7 @@ def build_form_agent_graph():
         theme: Optional[Dict[str, Any]]
         schema_build_mode: bool
         proposed_form_type: Optional[str]
+        greeted: bool
 
     def ensure_state_defaults(state: Dict[str, Any]) -> Dict[str, Any]:
         if "form" not in state:
@@ -104,11 +105,31 @@ def build_form_agent_graph():
             state["schema_build_mode"] = False
         if "proposed_form_type" not in state:
             state["proposed_form_type"] = None
+        if "greeted" not in state:
+            state["greeted"] = False
         return state
 
     async def ask_or_finish(state: Dict[str, Any]):
         state = ensure_state_defaults(state)
         logger.debug("ask_or_finish: next_field_index=%s asked_index=%s awaiting=%s", state.get("next_field_index"), state.get("asked_index"), state.get("awaiting_confirmation"))
+
+        # Friendly greeting once
+        if (not state.get("greeted")):
+            services_list = []
+            try:
+                for key, val in forms_manifest.items():
+                    title = val.get("title") or key.replace("_", " ").title()
+                    services_list.append(f"- {title} ({key})")
+            except Exception:
+                services_list = []
+            services_text = "\n".join(services_list) if services_list else "- Service Authorization (service_auth)\n- Exit Request (exit_request)\n- Reimbursement (reimbursement)\n- Bonafide Certificate (bonafide_certificate)"
+            greet = (
+                "Hi, I'm HelpDesk Assistant. I can help you create and submit forms.\n\n"
+                "Here are some forms I can create right away:\n"
+                f"{services_text}\n\n"
+                "Tell me which one you want (e.g., 'reimbursement') or describe a new form (e.g., 'create a policy form'), and I'll build it for you."
+            )
+            return {"messages": [AIMessage(content=greet)], "greeted": True}
 
         # If schema not chosen yet, ask which form type user needs
         if not state.get("schema") and not state.get("schema_build_mode"):
