@@ -1,13 +1,29 @@
 <div class="d-flex flex-column" style="min-height: 300px">
-  <div class="flex-grow-1 overflow-auto border rounded p-2 mb-2 bg-light">
-    <div *ngFor="let m of agui.messages$ | async" class="mb-2">
-      <div [ngClass]="{'text-end': m.role==='user'}">
-        <span class="badge bg-secondary me-1" *ngIf="m.role==='assistant'">Agent</span>
-        <span class="badge bg-primary ms-1" *ngIf="m.role==='user'">You</span>
+  <div class="flex-grow-1 overflow-auto p-2 mb-2">
+    <!-- Welcome chooser -->
+    <div *ngIf="showWelcome" class="mb-3">
+      <div class="card" style="border-radius: var(--app-radius);">
+        <div class="card-body" style="background: var(--app-card-bg); color: var(--app-text); font-family: var(--app-font);">
+          <h5 class="mb-2">Hi, I'm HelpDesk Assistant</h5>
+          <p class="mb-3">I can help you create and submit IT helpdesk related requests. Choose one to begin, or describe a new request and I'll build it.</p>
+          <div class="d-flex flex-wrap gap-2">
+            <button class="btn btn-sm btn-outline-primary" *ngFor="let r of requests" (click)="choose(r.key)">{{ r.label }}</button>
+          </div>
+        </div>
       </div>
-      <div [ngClass]="{'bg-primary text-white': m.role==='user','bg-white border': m.role==='assistant'}"
-           class="d-inline-block px-3 py-2 rounded-3">
-        {{ m.text }}
+    </div>
+
+    <!-- Chat messages -->
+    <div class="border rounded p-2 bg-light">
+      <div *ngFor="let m of agui.messages$ | async" class="mb-2">
+        <div [ngClass]="{'text-end': m.role==='user'}">
+          <span class="badge bg-secondary me-1" *ngIf="m.role==='assistant'">Agent</span>
+          <span class="badge bg-primary ms-1" *ngIf="m.role==='user'">You</span>
+        </div>
+        <div [ngClass]="{'bg-primary text-white': m.role==='user','bg-white border': m.role==='assistant'}"
+             class="d-inline-block px-3 py-2 rounded-3">
+          {{ m.text }}
+        </div>
       </div>
     </div>
   </div>
