@@ -7,6 +7,7 @@
           <p class="mb-3">Hi, I'm HelpDesk Assistant. I can help you create and submit IT helpdesk related requests. Here are some requests I can create right away, or you can instruct me to create a dynamic form for you.</p>
           <div class="d-flex flex-wrap gap-2">
             <button class="btn btn-sm btn-outline-primary" *ngFor="let r of requests" (click)="choose(r.key)">{{ r.label }}</button>
+            <button class="btn btn-sm btn-primary" (click)="choose('__new_form__')">Create Dynamic Form</button>
           </div>
         </div>
       </div>
@@ -33,6 +34,15 @@
              class="d-inline-block px-3 py-2 rounded-3">
           {{ m.text }}
         </div>
+      </div>
+    </div>
+
+    <!-- Inline dynamic form field spec capture -->
+    <div *ngIf="collectFieldSpecs" class="mt-2">
+      <label class="form-label small text-muted">Enter field names and types, then Generate</label>
+      <div class="input-group">
+        <input [(ngModel)]="fieldSpecText" class="form-control" placeholder="e.g., name:text, age:number, start_date:date, department:select[HR,Finance,IT]" />
+        <button class="btn btn-success" (click)="confirmFieldSpecs()">Generate</button>
       </div>
     </div>
   </div>

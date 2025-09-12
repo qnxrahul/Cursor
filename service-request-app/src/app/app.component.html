@@ -350,7 +350,12 @@
     </div>
     <div class="col-lg-7 col-md-6">
       <div class="card shadow-sm h-100">
-        <div class="card-header">Service Request Form</div>
+        <div class="card-header">
+          <ng-container *ngIf="(agui?.state$ | async) as st; else fallback">
+            {{ st && st['form_type'] ? (st['form_type'] | titlecase) + ' Form' : 'Form' }}
+          </ng-container>
+          <ng-template #fallback>Form</ng-template>
+        </div>
         <div class="card-body">
           <app-service-request-form></app-service-request-form>
         </div>
