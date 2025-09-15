@@ -147,44 +147,17 @@ def build_form_agent_graph():
             msg = f"Which form would you like to fill? (choices: {choices})"
             return {"messages": [AIMessage(content=msg)]}
 
-        # If building a custom schema, ask user to provide fields specification
+        # If building a custom schema, emit an Adaptive Card form builder
         if state.get("schema_build_mode") and not state.get("schema"):
-            hint = (
-                "We don't have a manifest for that form. Please list fields as 'key:type:required(options)', "
-                "comma-separated.\n"
-                "- Types: text, email, number, date, textarea, select, radio, checkbox\n"
-                "- Example: name:text:required, email:email:required, status:select:required(pending,approved)\n"
-                "Optionally set submit label like: submit_label:Send"
-            )
-            return {"messages": [AIMessage(content=hint)]}
+            return {"card": build_form_builder_card(state)}
 
-        # If schema chosen but not confirmed, suppress preview message (chat-side editor handles changes)
+        # If schema chosen but not confirmed, provide editor card
         if not state.get("schema_confirmed"):
             # If user already said they want changes, proactively ask for specifics
             if state.get("awaiting_schema_changes"):
                 state["awaiting_schema_changes"] = False
-                return {"messages": [AIMessage(content=(
-                    "Okay. Tell me what to change — you can:\n"
-                    "- add field key:type:required(options)\n"
-                    "- remove field <name> (by key or label)\n"
-                    "- theme {\"primary\": \"#0052cc\", ...}\n"
-                    "Describe edits naturally if you prefer."
-                ))]}
-            # Provide an adaptive card to drive edits without LLM tokens
-            ac = {
-                "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
-                "type": "AdaptiveCard",
-                "version": "1.5",
-                "body": [
-                    {"type": "TextBlock", "text": "Adjust the form or proceed", "weight": "Bolder", "size": "Medium"},
-                    {"type": "TextBlock", "isSubtle": True, "wrap": True, "text": "Use the editor below to add/remove fields, then start filling."}
-                ],
-                "actions": [
-                    {"type": "Action.Submit", "title": "Open Editor", "data": {"action": "schema_edit"}},
-                    {"type": "Action.Submit", "title": "Start Filling", "data": {"action": "proceed"}}
-                ]
-            }
-            return {"card": ac}
+                return {"card": build_form_builder_card(state)}
+            return {"card": build_form_builder_card(state)}
 
         # If awaiting confirmation, ask to confirm the pending value
         if state.get("awaiting_confirmation") and state.get("pending_field_index") is not None:
@@ -226,6 +199,56 @@ def build_form_agent_graph():
         # Ensure messages are not persisted in the checkpoint to avoid regenerate mode
         logger.debug("cleanup_messages: purge before checkpoint")
         return {"messages": []}
+
+    def ensure_schema_initialized(st: Dict[str, Any]):
+        if not st.get("schema"):
+            st["schema"] = {"title": st.get("proposed_form_type") or "custom", "fields": []}
+            st["form_type"] = (st.get("proposed_form_type") or "custom").replace(" ", "_")
+        if not isinstance(st["schema"].get("fields", []), list):
+            st["schema"]["fields"] = []
+
+    def build_form_builder_card(st: Dict[str, Any]) -> Dict[str, Any]:
+        fields = []
+        try:
+            for f in (st.get("schema", {}).get("fields", []) or []):
+                label = f.get("label") or f.get("key")
+                typ = f.get("type")
+                req = "*" if f.get("required") else ""
+                fields.append(f"- {label} ({typ}{', required' if req else ''})")
+        except Exception:
+            fields = []
+        preview = "\n".join(fields)
+        return {
+            "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+            "type": "AdaptiveCard",
+            "version": "1.5",
+            "body": [
+                {"type": "TextBlock", "text": "Form Builder", "weight": "Bolder", "size": "Medium"},
+                {"type": "TextBlock", "wrap": True, "isSubtle": True, "text": "Add a field below or remove by key/label. Click Done to start filling."},
+                {"type": "TextBlock", "wrap": True, "text": preview or "(no fields)"},
+                {"type": "TextBlock", "text": "New Field", "weight": "Bolder"},
+                {"type": "Input.Text", "placeholder": "Label (e.g., Employee Name)", "id": "label"},
+                {"type": "Input.ChoiceSet", "id": "type", "style": "compact", "value": "text", "choices": [
+                    {"title": "Text", "value": "text"},
+                    {"title": "Email", "value": "email"},
+                    {"title": "Number", "value": "number"},
+                    {"title": "Date", "value": "date"},
+                    {"title": "Textarea", "value": "textarea"},
+                    {"title": "Select", "value": "select"},
+                    {"title": "Radio", "value": "radio"},
+                    {"title": "Checkbox", "value": "checkbox"}
+                ]},
+                {"type": "Input.Toggle", "title": "Required", "valueOn": "true", "valueOff": "false", "id": "required"},
+                {"type": "Input.Text", "placeholder": "Options (comma separated)", "id": "options"},
+                {"type": "TextBlock", "text": "Remove Field", "weight": "Bolder"},
+                {"type": "Input.Text", "placeholder": "Key or Label to remove", "id": "remove"}
+            ],
+            "actions": [
+                {"type": "Action.Submit", "title": "Add Field", "data": {"action": "fb_add", "bind": ["label","type","required","options"]}},
+                {"type": "Action.Submit", "title": "Remove Field", "data": {"action": "fb_remove", "bind": ["remove"]}},
+                {"type": "Action.Submit", "title": "Done", "data": {"action": "fb_done"}}
+            ]
+        }
 
     async def process_user(state: Dict[str, Any]):
         state = ensure_state_defaults(state)
@@ -712,6 +735,44 @@ def build_form_agent_graph():
                     obj = json.loads(txt)
                     ac = obj.get('ac') or {}
                     act = (ac.get('action') or '').lower()
+                    # Form builder actions
+                    if act == 'fb_add':
+                        ensure_schema_initialized(state)
+                        try:
+                            label = (ac.get('label') or '').strip()
+                            typ = (ac.get('type') or 'text').strip().lower()
+                            req = str(ac.get('required') or '').lower() in ('true','1','yes','on')
+                            opts_raw = (ac.get('options') or '').strip()
+                            options = [o.strip() for o in re.split(r",|/|\bor\b|\band\b", opts_raw, flags=re.IGNORECASE) if o.strip()]
+                            key = re.sub(r"[^a-z0-9_]+","_", label.strip().lower().replace(" ", "_")).strip("_") or f"field_{len(state['schema']['fields'])}"
+                            new_f: Dict[str, Any] = {"key": key, "label": label or key.title(), "type": typ, "required": req}
+                            if options and typ in ("select","radio","checkbox"):
+                                new_f["options"] = options
+                            state["schema"]["fields"].append(new_f)  # type: ignore
+                            logger.debug("FB add: %s", new_f)
+                        except Exception:
+                            logger.exception("FB add failed")
+                        return state
+                    if act == 'fb_remove':
+                        ensure_schema_initialized(state)
+                        name_raw = (ac.get('remove') or '').strip()
+                        name_key = re.sub(r"[^a-z0-9_]+", "_", name_raw.strip().lower().replace(" ", "_")).strip("_")
+                        fields = state["schema"]["fields"]  # type: ignore
+                        keep = []
+                        for f in fields:
+                            fk = str(f.get("key",""))
+                            fl = str(f.get("label",""))
+                            if fk.strip().lower() == name_key or " ".join(fl.strip().lower().split()) == " ".join(name_raw.strip().lower().split()):
+                                continue
+                            keep.append(f)
+                        state["schema"]["fields"] = keep  # type: ignore
+                        logger.debug("FB remove: %s", name_raw)
+                        return state
+                    if act == 'fb_done':
+                        # confirm schema and advance
+                        state["schema_confirmed"] = True
+                        logger.debug("FB done -> confirmed")
+                        return state
                     if act == 'schema_edit':
                         state["awaiting_schema_changes"] = True
                         logger.debug("AC action -> schema_edit")
