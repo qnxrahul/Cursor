@@ -250,11 +250,16 @@ export class AguiChatComponent implements OnInit, OnDestroy {
       const card = new AdaptiveCards.AdaptiveCard();
       card.onExecuteAction = (action: any) => {
         const data = (action && (action.data || {})) || {};
-        if (data && typeof data === 'object') {
-          // Prefer compact JSON actions to reduce tokens
-          const payload = JSON.stringify({ ac: data });
-          this.agui.send(payload);
+        const inputs = (action as any).getInputs?.() || [];
+        const values: any = {};
+        for (const inp of inputs) {
+          const id = (inp && inp.id) || (inp && inp._id);
+          if (!id) continue;
+          values[id] = (inp.value != null ? inp.value : '');
         }
+        const merged = { ...data, ...values };
+        const payload = JSON.stringify({ ac: merged });
+        this.agui.send(payload);
       };
       card.parse(cardPayload);
       const rendered = card.render();
