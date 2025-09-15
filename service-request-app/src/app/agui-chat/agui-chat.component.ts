@@ -121,7 +121,7 @@ export class AguiChatComponent implements OnInit, OnDestroy {
     // If input matches a known request, route to backend immediately
     const reqKeyEarly = this.parseRequestKey(lower);
     if (reqKeyEarly) {
-      this.agui.send(reqKeyEarly);
+      this.agui.send(reqKeyEarly!);
       this.optionsAllowed = false;
       this.input = '';
       return;
