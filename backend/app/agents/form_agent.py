@@ -173,8 +173,8 @@ def build_form_agent_graph():
             fields = [f.get("label") or f.get("key") for f in state["schema"].get("fields", [])]
             preview = "\n - " + "\n - ".join(fields) if fields else " (no fields)"
             msg = (
-                f"I will render the '{state.get('form_type')}' with these fields:{preview}\n"
-                "Reply 'yes' to confirm, 'no' to change, or specify changes (e.g., add field amount:number:required, remove field urgency, theme {\"primary\": \"#0052cc\"})."
+                f"I have rendered the '{state.get('form_type')}' with these fields:{preview}\n"
+                "You can now add or remove fields (e.g., add field amount:number:required, remove field urgency) or update theme. No need to say yes or no."
             )
             return {"messages": [AIMessage(content=msg)]}
 
