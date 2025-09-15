@@ -18,6 +18,7 @@ export class ServiceRequestFormComponent implements OnDestroy {
   pendingRemovals = new Set<string>();
   private subs: Subscription[] = [];
   private cardHostId = 'ac-form-host';
+  private lastRenderedCard = '';
 
   constructor(private fb: FormBuilder, private agui: AguiService) {
     this.form = this.fb.group({});
@@ -71,6 +72,18 @@ export class ServiceRequestFormComponent implements OnDestroy {
       }
       if (typeof st?.['allow_submit'] === 'boolean') {
         this.allowSubmit = this.allowSubmit || !!st['allow_submit'];
+      }
+      // Render Adaptive Card form when no server-provided card
+      const card = (st && (st as any).card) as any;
+      if (card) {
+        setTimeout(() => this.renderAdaptiveCard(card));
+      } else if (this.schema) {
+        const ac = this.buildFormAdaptiveCard(this.schema, (st && (st as any).form) || {});
+        const sig = JSON.stringify(ac);
+        if (sig !== this.lastRenderedCard) {
+          this.lastRenderedCard = sig;
+          setTimeout(() => this.renderAdaptiveCard(ac));
+        }
       }
     });
     this.subs.push(s);
@@ -143,13 +156,65 @@ export class ServiceRequestFormComponent implements OnDestroy {
       card.onExecuteAction = (action: any) => {
         const data = (action && (action.data || {})) || {};
         if (data && typeof data === 'object') {
-          this.agui.send(JSON.stringify({ ac: data }));
+          // For form submit, also capture all inputs
+          if (data && data.action === 'form_fill_submit') {
+            const inputs = (action as any).getInputs?.() || [];
+            const payload: any = {};
+            for (const inp of inputs) {
+              const id = (inp && inp.id) || (inp && inp._id);
+              if (!id) continue;
+              payload[id] = (inp.value != null ? inp.value : '');
+            }
+            this.agui.send(JSON.stringify({ ac: { action: 'form_fill_submit', values: payload } }));
+          } else {
+            this.agui.send(JSON.stringify({ ac: data }));
+          }
         }
       };
       card.parse(cardPayload);
       const rendered = card.render();
       if (rendered) host.appendChild(rendered);
     } catch {}
+  }
+
+  private buildFormAdaptiveCard(schema: any, form: Record<string, any>): any {
+    const fields = Array.isArray(schema?.fields) ? schema.fields : [];
+    const body: any[] = [
+      { type: 'TextBlock', text: (schema?.title || 'Form'), weight: 'Bolder', size: 'Medium' }
+    ];
+    for (const f of fields) {
+      const key = f.key;
+      const label = f.label || key;
+      const type = (f.type || 'text').toLowerCase();
+      const required = !!f.required;
+      const val = form[key] ?? '';
+      body.push({ type: 'TextBlock', text: label + (required ? ' *' : ''), wrap: true });
+      if (type === 'textarea') {
+        body.push({ type: 'Input.Text', id: key, isMultiline: true, value: String(val || '') });
+      } else if (type === 'select') {
+        const choices = (f.options || []).map((o: string) => ({ title: o, value: o }));
+        body.push({ type: 'Input.ChoiceSet', id: key, style: 'compact', value: String(val || ''), choices });
+      } else if (type === 'radio') {
+        const choices = (f.options || []).map((o: string) => ({ title: o, value: o }));
+        body.push({ type: 'Input.ChoiceSet', id: key, style: 'expanded', isMultiSelect: false, value: String(val || ''), choices });
+      } else if (type === 'checkbox') {
+        const arr = Array.isArray(val) ? val : [];
+        const choices = (f.options || []).map((o: string) => ({ title: o, value: o }));
+        body.push({ type: 'Input.ChoiceSet', id: key, isMultiSelect: true, value: arr.join(','), choices });
+      } else if (type === 'date') {
+        body.push({ type: 'Input.Date', id: key, value: String(val || '') });
+      } else if (type === 'number') {
+        body.push({ type: 'Input.Number', id: key, value: val === '' ? undefined : Number(val) });
+      } else if (type === 'email' || type === 'text' || type === 'password' || type === 'tel' || type === 'url') {
+        body.push({ type: 'Input.Text', id: key, value: String(val || '') });
+      } else {
+        body.push({ type: 'Input.Text', id: key, value: String(val || '') });
+      }
+    }
+    const actions = [
+      { type: 'Action.Submit', title: (schema?.submitLabel || 'Submit'), data: { action: 'form_fill_submit' } }
+    ];
+    return { $schema: 'http://adaptivecards.io/schemas/adaptive-card.json', type: 'AdaptiveCard', version: '1.5', body, actions };
   }
 
   ngOnDestroy(): void {

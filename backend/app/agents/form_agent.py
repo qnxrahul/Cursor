@@ -773,6 +773,18 @@ def build_form_agent_graph():
                         state["schema_confirmed"] = True
                         logger.debug("FB done -> confirmed")
                         return state
+                    if act == 'form_fill_submit':
+                        try:
+                            vals = ac.get('values') or {}
+                            if isinstance(vals, dict):
+                                for k, v in vals.items():
+                                    state.setdefault('form', {})[k] = v
+                            # Move to end to signal done
+                            state['next_field_index'] = len(state.get('schema',{}).get('fields',[]) or FIELDS)
+                            logger.debug("Form fill submit -> %s", list((ac.get('values') or {}).keys()))
+                        except Exception:
+                            logger.exception("Form fill submit failed")
+                        return state
                     if act == 'schema_edit':
                         state["awaiting_schema_changes"] = True
                         logger.debug("AC action -> schema_edit")
