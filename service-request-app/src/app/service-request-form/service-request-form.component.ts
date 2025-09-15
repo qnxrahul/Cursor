@@ -226,7 +226,7 @@ export class ServiceRequestFormComponent implements OnDestroy {
       }
     }
     const actions = [
-      { type: 'Action.Submit', title: (schema?.submitLabel || 'Submit'), data: { action: 'form_fill_submit' } }
+      { type: 'Action.Submit', title: `🚀 ${schema?.submitLabel || 'Submit'}`, data: { action: 'form_fill_submit' } }
     ];
     return { $schema: 'http://adaptivecards.io/schemas/adaptive-card.json', type: 'AdaptiveCard', version: '1.5', body, actions };
   }

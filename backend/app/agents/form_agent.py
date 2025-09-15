@@ -236,7 +236,8 @@ def build_form_agent_graph():
                     {"title": "Textarea", "value": "textarea"},
                     {"title": "Select", "value": "select"},
                     {"title": "Radio", "value": "radio"},
-                    {"title": "Checkbox", "value": "checkbox"}
+                    {"title": "Checkbox", "value": "checkbox"},
+                    {"title": "Button", "value": "button"}
                 ]},
                 {"type": "Input.Toggle", "title": "Required", "valueOn": "true", "valueOff": "false", "id": "required"},
                 {"type": "Input.Text", "placeholder": "Options (comma separated)", "id": "options"},
@@ -244,9 +245,9 @@ def build_form_agent_graph():
                 {"type": "Input.Text", "placeholder": "Key or Label to remove", "id": "remove"}
             ],
             "actions": [
-                {"type": "Action.Submit", "title": "Add Field", "data": {"action": "fb_add", "bind": ["label","type","required","options"]}},
-                {"type": "Action.Submit", "title": "Remove Field", "data": {"action": "fb_remove", "bind": ["remove"]}},
-                {"type": "Action.Submit", "title": "Done", "data": {"action": "fb_done"}}
+                {"type": "Action.Submit", "title": "➕ Add Field", "data": {"action": "fb_add", "bind": ["label","type","required","options"]}},
+                {"type": "Action.Submit", "title": "🗑 Remove Field", "data": {"action": "fb_remove", "bind": ["remove"]}},
+                {"type": "Action.Submit", "title": "✅ Done", "data": {"action": "fb_done"}}
             ]
         }
 
