@@ -729,7 +729,9 @@ def build_form_agent_graph():
             no_patterns = [
                 r"\b(no|n)\b",
                 r"\b(change|edit|modify|revise|update)\b",
-                r"\b(want|need|make) changes?\b",
+                r"\b(want|need) to (make|do) (some|few|any)?\s*changes\b",
+                r"\b(make|do) (some|few|any)?\s*changes\b",
+                r"\bfew changes\b|\bsome changes\b|\bminor changes\b|\bsmall changes\b",
                 r"(don't|do not) (proceed|continue)",
                 r"\b(not good|don'?t like)\b",
             ]
