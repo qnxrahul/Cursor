@@ -33,3 +33,27 @@
 }
 
 /* You can add global styles to this file, and also import other style files */
+
+/* Adaptive Cards button polish */
+.ac-actionSet .ac-pushButton, .ac-actionSet button {
+  background: var(--app-primary) !important;
+  color: #fff !important;
+  border: none !important;
+  border-radius: 10px !important;
+  padding: 10px 14px !important;
+  font-family: var(--app-font) !important;
+  font-weight: 600 !important;
+  letter-spacing: .2px;
+  transition: transform .06s ease, box-shadow .2s ease, background .2s ease !important;
+}
+.ac-actionSet .ac-pushButton:hover, .ac-actionSet button:hover {
+  background: color-mix(in srgb, var(--app-primary) 85%, #000 0%) !important;
+  box-shadow: 0 6px 16px rgba(13,110,253, .25) !important;
+}
+.ac-actionSet .ac-pushButton:active, .ac-actionSet button:active {
+  transform: translateY(1px) !important;
+}
+.ac-actionSet .ac-pushButton:focus-visible, .ac-actionSet button:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--app-accent) 50%, transparent) !important;
+  outline-offset: 2px !important;
+}
