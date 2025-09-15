@@ -205,6 +205,19 @@ export class AguiChatComponent implements OnInit, OnDestroy {
     this.agui.send(key);
   }
 
+  onAgentSideApply(evt: { removeKeys: string[]; addFields: Array<{ label: string; type: string; required?: boolean; options?: string[] }> }) {
+    // Remove then add, same as form-side editor previously
+    for (const k of evt.removeKeys || []) this.agui.send(`remove field ${k}`);
+    for (const nf of evt.addFields || []) {
+      const key = this.keyFromLabel(nf.label);
+      const type = (nf.type || 'text').toLowerCase();
+      const req = nf.required ? ':required' : '';
+      const opts = (Array.isArray(nf.options) && nf.options.length > 0 && (type === 'select' || type === 'radio' || type === 'checkbox'))
+        ? `(${nf.options.join(', ')})` : '';
+      this.agui.send(`add field ${key}:${type}${req}${opts}`);
+    }
+  }
+
   get showWelcome(): boolean {
     // Show welcome chooser if no schema chosen yet
     return !this.state?.schema && this.optionsAllowed && !this.awaitingYesNo && !this.awaitingFieldSpec && !this.userDeclined;
