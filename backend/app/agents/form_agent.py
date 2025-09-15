@@ -633,7 +633,7 @@ def build_form_agent_graph():
                 logger.exception("Failed parsing custom schema spec")
                 return state
 
-        # If schema not confirmed, parse confirmation or change commands
+        # If schema not confirmed, parse confirmation or change commands (flexible phrasing)
         if not state.get("schema_confirmed"):
             txt = (state.get("pending_user_text") or "").strip()
             state["pending_user_text"] = None
@@ -641,12 +641,38 @@ def build_form_agent_graph():
             if not txt:
                 return state
             low = txt.lower()
-            if low in ("yes", "y", "ok", "okay", "confirm", "looks good"):
+            # Flexible yes/no understanding
+            def contains_any(text: str, patterns: List[str]) -> bool:
+                for pat in patterns:
+                    if re.search(pat, text, flags=re.IGNORECASE):
+                        return True
+                return False
+            yes_patterns = [
+                r"\b(yes|y)\b",
+                r"\b(ok|okay)\b",
+                r"\b(confirm(ed)?|confirmed)\b",
+                r"\b(looks (good|fine)|good to go|all good)\b",
+                r"\b(proceed|continue|go ahead|start (now|filling)|ready)\b",
+                r"\b(i'?m done|i am done|done)\b",
+                r"\b(no changes?|no change needed)\b",
+                r"(don't|do not) change anything",
+                r"\bkeep( it)?( as is)?\b",
+                r"i don'?t want to make any change",
+                r"i do not want to make any change",
+            ]
+            no_patterns = [
+                r"\b(no|n)\b",
+                r"\b(change|edit|modify|revise|update)\b",
+                r"\b(want|need|make) changes?\b",
+                r"(don't|do not) (proceed|continue)",
+                r"\b(not good|don'?t like)\b",
+            ]
+            if contains_any(low, yes_patterns):
                 state["schema_confirmed"] = True
-                logger.debug("Schema confirmed by user")
+                logger.debug("Schema confirmed by user (flexible match)")
                 return state
-            if low in ("no", "n", "change", "edit"):
-                logger.debug("User requested schema changes; waiting for specifics")
+            if contains_any(low, no_patterns):
+                logger.debug("User requested schema changes (flexible match); waiting for specifics")
                 return state
             # Simple command parsing
             # theme {json}
