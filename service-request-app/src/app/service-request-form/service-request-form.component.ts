@@ -49,9 +49,9 @@ export class ServiceRequestFormComponent implements OnDestroy {
         }
       }
       // Render any Adaptive Card on the form side as well
-      const card = (st && (st as any).card) as any;
-      if (card) {
-        setTimeout(() => this.renderAdaptiveCard(card));
+      const serverCard = (st && (st as any).card) as any;
+      if (serverCard) {
+        setTimeout(() => this.renderAdaptiveCard(serverCard));
       }
       if (st && st['form']) {
         const entries = Object.entries(st['form'] as Record<string, any>);
@@ -74,9 +74,9 @@ export class ServiceRequestFormComponent implements OnDestroy {
         this.allowSubmit = this.allowSubmit || !!st['allow_submit'];
       }
       // Render Adaptive Card form when no server-provided card
-      const card = (st && (st as any).card) as any;
-      if (card) {
-        setTimeout(() => this.renderAdaptiveCard(card));
+      const serverCard2 = (st && (st as any).card) as any;
+      if (serverCard2) {
+        setTimeout(() => this.renderAdaptiveCard(serverCard2));
       } else if (this.schema) {
         const ac = this.buildFormAdaptiveCard(this.schema, (st && (st as any).form) || {});
         const sig = JSON.stringify(ac);
