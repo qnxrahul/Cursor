@@ -1,3 +1,10 @@
+<!-- Adaptive Card host for form-side interactivity -->
+<div *ngIf="!schemaConfirmed" class="mb-3">
+  <div id="ac-form-host"></div>
+  <hr />
+  <div class="small text-muted">You can also edit fields using the controls below.</div>
+  <br />
+</div>
 <form [formGroup]="form" (ngSubmit)="submit()" class="row g-3">
   <ng-container *ngIf="schema?.fields as fields">
     <ng-container *ngFor="let f of fields; let i = index">

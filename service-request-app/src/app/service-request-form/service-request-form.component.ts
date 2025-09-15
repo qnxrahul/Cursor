@@ -2,6 +2,7 @@ import { Component, OnDestroy } from '@angular/core';
 import { FormBuilder, FormGroup, Validators, FormControl } from '@angular/forms';
 import { Subscription } from 'rxjs';
 import { AguiService } from '../services/agui.service';
+import * as AdaptiveCards from 'adaptivecards';
 
 @Component({
   selector: 'app-service-request-form',
@@ -16,6 +17,7 @@ export class ServiceRequestFormComponent implements OnDestroy {
   showEditor = false;
   pendingRemovals = new Set<string>();
   private subs: Subscription[] = [];
+  private cardHostId = 'ac-form-host';
 
   constructor(private fb: FormBuilder, private agui: AguiService) {
     this.form = this.fb.group({});
@@ -44,6 +46,11 @@ export class ServiceRequestFormComponent implements OnDestroy {
           const prev = this.agui.state$.value || {};
           this.agui.state$.next({ ...prev, schema_confirmed: !!prev['schema_confirmed'] });
         }
+      }
+      // Render any Adaptive Card on the form side as well
+      const card = (st && (st as any).card) as any;
+      if (card) {
+        setTimeout(() => this.renderAdaptiveCard(card));
       }
       if (st && st['form']) {
         const entries = Object.entries(st['form'] as Record<string, any>);
@@ -125,6 +132,24 @@ export class ServiceRequestFormComponent implements OnDestroy {
 
   private keyFromLabel(label: string): string {
     return (label || '').toLowerCase().replace(/[^a-z0-9\s]/g, '').trim().replace(/\s+/g, '_');
+  }
+
+  private renderAdaptiveCard(cardPayload: any) {
+    try {
+      const host = document.getElementById(this.cardHostId);
+      if (!host) return;
+      host.innerHTML = '';
+      const card = new AdaptiveCards.AdaptiveCard();
+      card.onExecuteAction = (action: any) => {
+        const data = (action && (action.data || {})) || {};
+        if (data && typeof data === 'object') {
+          this.agui.send(JSON.stringify({ ac: data }));
+        }
+      };
+      card.parse(cardPayload);
+      const rendered = card.render();
+      if (rendered) host.appendChild(rendered);
+    } catch {}
   }
 
   ngOnDestroy(): void {
