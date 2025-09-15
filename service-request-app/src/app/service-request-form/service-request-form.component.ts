@@ -12,6 +12,7 @@ export class ServiceRequestFormComponent implements OnDestroy {
   done = false;
   schema: any = null;
   allowSubmit = false;
+  schemaConfirmed = false;
   private subs: Subscription[] = [];
 
   constructor(private fb: FormBuilder, private agui: AguiService) {
@@ -51,7 +52,8 @@ export class ServiceRequestFormComponent implements OnDestroy {
       }
       // Allow submit only when backend signals schema is confirmed or done
       if (typeof st?.['schema_confirmed'] === 'boolean') {
-        this.allowSubmit = !!st['schema_confirmed'];
+        this.schemaConfirmed = !!st['schema_confirmed'];
+        this.allowSubmit = this.schemaConfirmed;
       } else if (this.done) {
         this.allowSubmit = true;
       }

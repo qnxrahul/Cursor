@@ -427,6 +427,9 @@ def build_form_agent_graph():
 
                 nat_fields: List[Dict[str, Any]] = []
                 desc = spec_text
+                # Remove noisy prefixes like "Parsed fields:" or quotes artefacts
+                desc = re.sub(r"parsed\s*fields\s*:\s*", "", desc, flags=re.IGNORECASE)
+                desc = desc.replace("“", '"').replace("”", '"').replace("’", "'")
                 # Extract submit label globally (supports 'Submit label should be Send.')
                 msub_global = re.search(r"submit\s*label\s*(?:should\s*be|is|:)?\s*([^\.,;\n]+)", desc, flags=re.IGNORECASE)
                 if msub_global:
@@ -511,7 +514,14 @@ def build_form_agent_graph():
 
                     # parse options
                     if ftype in ("select", "radio", "checkbox"):
-                        # look for 'with pending/approved' or 'yes/no'
+                        # look for 'with (Pending, Approved)' or 'with pending/approved' or options in parentheses
+                        mparen = re.search(r"\(([^)]+)\)", s)
+                        if mparen:
+                            raw = mparen.group(1)
+                            for token in re.split(r"/|,|\\bor\\b|\\band\\b", raw, flags=re.IGNORECASE):
+                                t = token.strip()
+                                if t:
+                                    options.append(t)
                         mopts = re.search(r"with\s+([\w\-\s/]+)", low)
                         if mopts:
                             raw = mopts.group(1)

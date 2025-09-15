@@ -1,4 +1,12 @@
 <form [formGroup]="form" (ngSubmit)="submit()" class="row g-3">
+  <!-- Schema review overlay: show when schema exists but not confirmed -->
+  <div class="col-12" *ngIf="schema && !schemaConfirmed" style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:12px;">
+    <div class="d-flex flex-wrap gap-2 align-items-center">
+      <span class="text-muted">Review the fields above. Ready to proceed?</span>
+      <button type="button" class="btn btn-sm btn-primary" (click)="onUserReply('yes')">Start filling</button>
+      <button type="button" class="btn btn-sm btn-outline-secondary" (click)="onUserReply('no')">Change fields</button>
+    </div>
+  </div>
   <ng-container *ngIf="schema?.fields as fields">
     <ng-container *ngFor="let f of fields; let i = index">
       <div class="col-12" [ngClass]="{'col-md-6': f.type!=='textarea' && f.type!=='select', 'col-md-4': f.type==='select'}">
