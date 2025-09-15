@@ -829,6 +829,8 @@ def build_form_agent_graph():
         # Try LLM suggestion first, then heuristic normalization
         suggestion = llm_extract_field_suggestion(field_key, str(content))
         normalized = normalize_field_value(field_key, suggestion or str(content))
+        # Update form live for better binding UX; still ask for confirmation
+        state.setdefault("form", {})[field_key] = normalized
         state["awaiting_confirmation"] = True
         state["pending_field_index"] = idx
         state["pending_value"] = normalized

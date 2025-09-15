@@ -133,8 +133,24 @@ export class AguiService {
           if (typeof raw.schema_confirmed === 'boolean') next.schema_confirmed = raw.schema_confirmed;
         }
         if (e.snapshot && typeof e.snapshot === 'object') {
-          // e.snapshot often only includes messages/tools; keep merge minimal
-          if (Array.isArray((e.snapshot as any).messages)) next.messages = (e.snapshot as any).messages;
+          // Some adapters put state at root or under snapshot.state
+          const snap: any = e.snapshot as any;
+          const sstate: any = (snap && typeof snap.state === 'object') ? snap.state : snap;
+          // Merge structural state if present
+          if (sstate) {
+            if (sstate.form && typeof sstate.form === 'object') {
+              next.form = { ...(prev.form || {}), ...(sstate.form || {}) };
+            }
+            if (typeof sstate.next_field_index === 'number') next.next_field_index = sstate.next_field_index;
+            if (typeof sstate.asked_index === 'number') next.asked_index = sstate.asked_index;
+            if (sstate.schema) next.schema = sstate.schema;
+            if (sstate.form_type) next.form_type = sstate.form_type;
+            if (sstate.theme) next.theme = sstate.theme;
+            if (typeof sstate.schema_confirmed === 'boolean') next.schema_confirmed = sstate.schema_confirmed;
+          }
+          // Also sync messages if provided
+          const msgs = (snap as any).messages || (sstate && (sstate as any).messages);
+          if (Array.isArray(msgs)) next.messages = msgs;
         }
         this.state$.next(next);
         // Fallback to render assistant message if none streamed yet this turn
