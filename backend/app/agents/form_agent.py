@@ -77,6 +77,7 @@ def build_form_agent_graph():
         schema_build_mode: bool
         proposed_form_type: Optional[str]
         greeted: bool
+        awaiting_schema_changes: bool
 
     def ensure_state_defaults(state: Dict[str, Any]) -> Dict[str, Any]:
         if "form" not in state:
@@ -107,6 +108,8 @@ def build_form_agent_graph():
             state["proposed_form_type"] = None
         if "greeted" not in state:
             state["greeted"] = False
+        if "awaiting_schema_changes" not in state:
+            state["awaiting_schema_changes"] = False
         return state
 
     async def ask_or_finish(state: Dict[str, Any]):
@@ -157,6 +160,16 @@ def build_form_agent_graph():
 
         # If schema chosen but not confirmed, present fields and ask for changes
         if not state.get("schema_confirmed"):
+            # If user already said they want changes, proactively ask for specifics
+            if state.get("awaiting_schema_changes"):
+                state["awaiting_schema_changes"] = False
+                return {"messages": [AIMessage(content=(
+                    "Okay. Tell me what to change — you can:\n"
+                    "- add field key:type:required(options)\n"
+                    "- remove field <name> (by key or label)\n"
+                    "- theme {\"primary\": \"#0052cc\", ...}\n"
+                    "Describe edits naturally if you prefer."
+                ))]}
             fields = [f.get("label") or f.get("key") for f in state["schema"].get("fields", [])]
             preview = "\n - " + "\n - ".join(fields) if fields else " (no fields)"
             msg = (
@@ -683,6 +696,7 @@ def build_form_agent_graph():
                 return state
             if label == "CHANGE":
                 logger.debug("User requested schema changes (LLM classifier); waiting for specifics")
+                state["awaiting_schema_changes"] = True
                 return state
             # Flexible yes/no understanding
             def contains_any(text: str, patterns: List[str]) -> bool:
@@ -716,6 +730,7 @@ def build_form_agent_graph():
                 return state
             if contains_any(low, no_patterns):
                 logger.debug("User requested schema changes (flexible match); waiting for specifics")
+                state["awaiting_schema_changes"] = True
                 return state
             # Simple command parsing
             # theme {json}
