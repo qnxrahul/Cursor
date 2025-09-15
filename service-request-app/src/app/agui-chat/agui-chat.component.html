@@ -4,7 +4,6 @@
     
     <!-- Chat messages -->
     <div class="p-0">
-      <div id="agui-card-host" class="mb-2"></div>
       <div *ngFor="let m of agui.messages$ | async" class="mb-2 d-flex" [ngClass]="{'justify-content-end': m.role==='user'}">
         <div class="d-flex align-items-start" [ngClass]="{'flex-row-reverse': m.role==='user'}">
           <div class="rounded-circle d-inline-flex align-items-center justify-content-center me-2 ms-2"

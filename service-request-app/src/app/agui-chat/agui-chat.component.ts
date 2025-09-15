@@ -1,7 +1,6 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { Subscription } from 'rxjs';
 import { AguiService } from '../services/agui.service';
-import * as AdaptiveCards from 'adaptivecards';
 
 @Component({
   selector: 'app-agui-chat',
@@ -21,8 +20,6 @@ export class AguiChatComponent implements OnInit, OnDestroy {
   awaitingSchemaConfirm = false;
   editorExpanded = false;
   private editorInit = false;
-  // Adaptive card container id
-  private cardContainerId = 'agui-card-host';
   // Known requests (should mirror backend manifest keys)
   requests = [
     { key: 'service_auth', label: 'Service Authorization Request' },
@@ -43,11 +40,7 @@ export class AguiChatComponent implements OnInit, OnDestroy {
       if (this.state?.schema_confirmed) {
         this.editorExpanded = false;
       }
-      // Render adaptive card if provided by backend
-      const card = (this.state && (this.state as any).card) as any;
-      if (card) {
-        setTimeout(() => this.renderAdaptiveCard(card));
-      }
+      // Chat no longer renders adaptive cards (rendered on the form side only)
     });
     // Seed initial assistant greeting if no messages yet
     const existing = this.agui.messages$.value || [];
@@ -242,30 +235,7 @@ export class AguiChatComponent implements OnInit, OnDestroy {
 
   toggleEditor() { this.editorExpanded = !this.editorExpanded; }
 
-  private renderAdaptiveCard(cardPayload: any) {
-    try {
-      const container = document.getElementById(this.cardContainerId);
-      if (!container) return;
-      container.innerHTML = '';
-      const card = new AdaptiveCards.AdaptiveCard();
-      card.onExecuteAction = (action: any) => {
-        const data = (action && (action.data || {})) || {};
-        const inputs = (action as any).getInputs?.() || [];
-        const values: any = {};
-        for (const inp of inputs) {
-          const id = (inp && inp.id) || (inp && inp._id);
-          if (!id) continue;
-          values[id] = (inp.value != null ? inp.value : '');
-        }
-        const merged = { ...data, ...values };
-        const payload = JSON.stringify({ ac: merged });
-        this.agui.send(payload);
-      };
-      card.parse(cardPayload);
-      const rendered = card.render();
-      if (rendered) container.appendChild(rendered);
-    } catch {}
-  }
+  // Removed chat-side adaptive card rendering
 
   get showWelcome(): boolean {
     // Show welcome chooser if no schema chosen yet
