@@ -102,11 +102,13 @@ export class AguiChatComponent implements OnInit, OnDestroy {
 
     // Otherwise, steer toward custom dynamic form via natural language
     {
+      // Send user's message to the agent verbatim
+      this.agui.send(t);
+      // Show a single guidance message and wait for user fields
       const msgs = this.agui.messages$.value.slice();
-      msgs.push({ role: 'user', text: t });
       msgs.push({ role: 'assistant', text: 'No built-in request matched. You can paste your form fields or describe them naturally (e.g., name:text (required), email:email (required), status:select (Pending, Approved)).' });
       this.agui.messages$.next(msgs);
-      this.startFieldSpecPrompt(t);
+      this.startFieldSpecPrompt();
       this.input = '';
       return;
     }

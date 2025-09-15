@@ -344,7 +344,8 @@ def build_form_agent_graph():
 
         # Handle form type selection if schema not set
         if not state.get("schema") and not state.get("schema_build_mode"):
-            choice = (state.get("pending_user_text") or "").strip().lower()
+            orig_text = state.get("pending_user_text") or ""
+            choice = orig_text.strip().lower()
             state["pending_user_text"] = None
             state["messages"] = []
             selected_key = None
@@ -358,15 +359,28 @@ def build_form_agent_graph():
                         selected_key = k
                         break
             if not selected_key:
+                # Detect if the user's input already looks like a field specification
+                looks_like_spec = bool(re.search(r"(:\\s*(text|email|number|date|textarea|select|radio|checkbox))|yes\\s*/\\s*no|\\(([^)]*,[^)]*)\\)|having\\s+options", choice, flags=re.IGNORECASE)) or \
+                                   bool(re.search(r"required|optional", choice, flags=re.IGNORECASE)) or \
+                                   bool(re.search(r"^[-*]\\s*", orig_text, flags=re.MULTILINE))
                 # Enter custom schema build mode
                 state["schema_build_mode"] = True
-                state["proposed_form_type"] = (choice or "custom").strip() or "custom"
+                # Try to derive a form type from a leading '<type> form'
+                m_title = re.search(r"([A-Za-z][A-Za-z\s]+?)\s+form", orig_text, flags=re.IGNORECASE)
+                derived_type = (m_title.group(1).strip().lower() if m_title else choice or "custom")
+                state["proposed_form_type"] = derived_type or "custom"
+                if looks_like_spec:
+                    # Preserve the original text for immediate parsing in this same turn
+                    state["pending_user_text"] = orig_text
+                    # fall through into the parsing block below (no return)
+                else:
+                    return state
+            else:
+                state["schema"] = forms_manifest[selected_key]
+                state["form_type"] = selected_key
+                state["next_field_index"] = 0
+                logger.debug("Selected schema '%s' with %s fields", selected_key, len(state["schema"].get("fields", [])))
                 return state
-            state["schema"] = forms_manifest[selected_key]
-            state["form_type"] = selected_key
-            state["next_field_index"] = 0
-            logger.debug("Selected schema '%s' with %s fields", selected_key, len(state["schema"].get("fields", [])))
-            return state
 
         # Parse custom schema fields provided by user
         if state.get("schema_build_mode") and not state.get("schema") and state.get("pending_user_text"):
