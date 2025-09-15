@@ -633,7 +633,7 @@ def build_form_agent_graph():
                 logger.exception("Failed parsing custom schema spec")
                 return state
 
-        # If schema not confirmed, parse confirmation or change commands (flexible phrasing)
+        # If schema not confirmed, parse confirmation or change commands (LLM-assisted NLP + flexible phrasing)
         if not state.get("schema_confirmed"):
             txt = (state.get("pending_user_text") or "").strip()
             state["pending_user_text"] = None
@@ -641,6 +641,49 @@ def build_form_agent_graph():
             if not txt:
                 return state
             low = txt.lower()
+            # First try an NLP-based classifier if LLM is available
+            def classify_confirmation_intent(text: str) -> Optional[str]:
+                if llm is None:
+                    return None
+                try:
+                    sys = (
+                        "You are an intent classifier for a form schema review step.\n"
+                        "Decide whether the user confirms the schema or wants changes.\n"
+                        "Respond with EXACTLY ONE TOKEN from this set: YES, CHANGE, AMBIGUOUS.\n"
+                        "Definitions:\n- YES: user is satisfied and wants to proceed/start filling (e.g., yes, okay, looks good, proceed, I'm done, no changes).\n"
+                        "- CHANGE: user wants edits (e.g., no, change, edit, modify, remove/add fields, update theme).\n"
+                        "- AMBIGUOUS: unclear."
+                    )
+                    examples = [
+                        ("yes", "YES"),
+                        ("I'm done", "YES"),
+                        ("looks good, proceed", "YES"),
+                        ("no", "CHANGE"),
+                        ("let's remove urgency", "CHANGE"),
+                        ("add field amount:number:required", "CHANGE"),
+                        ("maybe", "AMBIGUOUS"),
+                    ]
+                    fewshot = []
+                    for u, a in examples:
+                        fewshot.append(HumanMessage(content=f"User: {u}"))
+                        fewshot.append(AIMessage(content=a))
+                    msg = [SystemMessage(content=sys)] + fewshot + [HumanMessage(content=f"User: {text}")]
+                    resp = llm.invoke(msg)  # type: ignore
+                    content = getattr(resp, "content", "").strip().upper()
+                    if content in {"YES", "CHANGE", "AMBIGUOUS"}:
+                        return content
+                except Exception:
+                    logger.exception("LLM classify confirmation failed")
+                return None
+
+            label = classify_confirmation_intent(txt)
+            if label == "YES":
+                state["schema_confirmed"] = True
+                logger.debug("Schema confirmed by user (LLM classifier)")
+                return state
+            if label == "CHANGE":
+                logger.debug("User requested schema changes (LLM classifier); waiting for specifics")
+                return state
             # Flexible yes/no understanding
             def contains_any(text: str, patterns: List[str]) -> bool:
                 for pat in patterns:
