@@ -16,6 +16,7 @@ export class AguiChatComponent implements OnInit, OnDestroy {
   userDeclined = false;
   awaitingYesNo = false;
   optionsAllowed = false;
+  matchedRequests: { key: string; label: string }[] = [];
   // Known requests (should mirror backend manifest keys)
   requests = [
     { key: 'service_auth', label: 'Service Authorization Request' },
@@ -31,7 +32,12 @@ export class AguiChatComponent implements OnInit, OnDestroy {
     // Seed initial assistant greeting if no messages yet
     const existing = this.agui.messages$.value || [];
     if (existing.length === 0) {
-      this.agui.messages$.next([{ role: 'assistant', text: 'Hi, how may I help you?' }]);
+      this.agui.messages$.next([{
+        role: 'assistant',
+        text: "Hi, I'm HelpDesk Assistant. I can help you create and submit IT helpdesk related requests. Here are some requests I can create right away, or you can instruct me to create a dynamic form for you."
+      }]);
+      this.optionsAllowed = true;
+      this.matchedRequests = [...this.requests];
     }
   }
 
@@ -43,29 +49,7 @@ export class AguiChatComponent implements OnInit, OnDestroy {
     this.hasUserResponded = true;
     const lower = t.toLowerCase();
 
-    // Handle outstanding yes/no prompt
-    if (this.awaitingYesNo) {
-      const affirmative = this.isAffirmative(t);
-      const negative = this.isNegative(t);
-      const msgs = this.agui.messages$.value.slice();
-      msgs.push({ role: 'user', text: t });
-      if (affirmative) {
-        msgs.push({ role: 'assistant', text: 'Great — please choose a request below or describe a new form.' });
-        this.awaitingYesNo = false;
-        this.userDeclined = false;
-        this.optionsAllowed = true;
-      } else if (negative) {
-        msgs.push({ role: 'assistant', text: 'I am limited to creating different IT service requests and dynamic form generation.' });
-        this.awaitingYesNo = false;
-        this.userDeclined = true;
-        this.optionsAllowed = false;
-      } else {
-        msgs.push({ role: 'assistant', text: "Please reply 'yes' to continue or 'no' to cancel." });
-      }
-      this.agui.messages$.next(msgs);
-      this.input = '';
-      return;
-    }
+    // We avoid rigid yes/no gating; make it more conversational.
 
     // If we previously asked for field specs, ALWAYS forward to AI agent
     if (this.awaitingFieldSpec) {
@@ -107,10 +91,37 @@ export class AguiChatComponent implements OnInit, OnDestroy {
       return;
     }
 
+    // Natural matching: if user seems to reference built-in requests, show matching options
+    const matches = this.findMatchingRequests(lower);
+    if (matches.length > 0) {
+      const msgs = this.agui.messages$.value.slice();
+      msgs.push({ role: 'user', text: t });
+      const names = matches.map(m => m.label).join(', ');
+      msgs.push({ role: 'assistant', text: `Got it. Based on what you said, these look relevant: ${names}. Please choose one below.` });
+      this.agui.messages$.next(msgs);
+      this.matchedRequests = matches;
+      this.optionsAllowed = true;
+      this.userDeclined = false;
+      this.awaitingYesNo = false;
+      this.input = '';
+      return;
+    }
+
+    // Otherwise, steer toward custom dynamic form via natural language
+    {
+      const msgs = this.agui.messages$.value.slice();
+      msgs.push({ role: 'user', text: t });
+      msgs.push({ role: 'assistant', text: 'No built-in request matched. You can paste your form fields or describe them naturally (e.g., name:text (required), email:email (required), status:select (Pending, Approved)).' });
+      this.agui.messages$.next(msgs);
+      this.startFieldSpecPrompt(t);
+      this.input = '';
+      return;
+    }
+
     // If input matches a known request, route to backend immediately
     const reqKeyEarly = this.parseRequestKey(lower);
     if (reqKeyEarly) {
-      this.agui.send(reqKeyEarly);
+      this.agui.send(reqKeyEarly!);
       this.optionsAllowed = false;
       this.input = '';
       return;
@@ -139,11 +150,14 @@ export class AguiChatComponent implements OnInit, OnDestroy {
 
     // Friendly gating if the user simply greets without asking for anything specific
     if (this.isGreetingOnly(lower)) {
+      // Just surface options again
       const msgs = this.agui.messages$.value.slice();
       msgs.push({ role: 'user', text: t });
-      msgs.push({ role: 'assistant', text: "Hi, I'm HelpDesk Assistant. I can help you create and submit IT helpdesk related requests. Here are some requests I can create right away, or you can instruct me to create a dynamic form for you. Say 'yes' or 'no' to continue." });
+      msgs.push({ role: 'assistant', text: 'Please choose a request below or describe the fields for a new form.' });
       this.agui.messages$.next(msgs);
-      this.awaitingYesNo = true;
+      this.matchedRequests = [...this.requests];
+      this.optionsAllowed = true;
+      this.awaitingYesNo = false;
       this.input = '';
       return;
     }
@@ -151,10 +165,11 @@ export class AguiChatComponent implements OnInit, OnDestroy {
     // Out-of-scope: apologize and ask yes/no to continue
     const msgs = this.agui.messages$.value.slice();
     msgs.push({ role: 'user', text: t });
-    msgs.push({ role: 'assistant', text: "Hi, I'm HelpDesk Assistant. Sorry, I can help you create and submit IT helpdesk related requests. Here are some requests I can create right away, or you can instruct me to create a dynamic form for you. Say 'yes' or 'no' to continue." });
+    msgs.push({ role: 'assistant', text: 'I can help with IT helpdesk requests. Please choose one below or describe the fields for a new form.' });
     this.agui.messages$.next(msgs);
-    this.awaitingYesNo = true;
-    this.optionsAllowed = false;
+    this.matchedRequests = [...this.requests];
+    this.optionsAllowed = true;
+    this.awaitingYesNo = false;
     this.input = '';
     return;
 
@@ -222,6 +237,29 @@ export class AguiChatComponent implements OnInit, OnDestroy {
     if (/(^|\s)form for\s+.+/.test(lower)) return true;
     if (/\b\w+\s+form\b/.test(lower)) return true; // e.g., "policy form"
     return false;
+  }
+
+  private findMatchingRequests(lower: string): { key: string; label: string }[] {
+    const mapping: { key: string; hints: string[] }[] = [
+      { key: 'service_auth', hints: ['service authorization', 'service auth', 'authorization', 'authorize service', 'service_auth'] },
+      { key: 'exit_request', hints: ['exit request', 'resignation', 'relieving letter', 'exit_request'] },
+      { key: 'reimbursement', hints: ['reimbursement', 'expense claim', 'claim back'] },
+      { key: 'bonafide_certificate', hints: ['bonafide certificate', 'bonafide', 'college certificate', 'bonafide_certificate'] }
+    ];
+    const keys = new Set<string>();
+    for (const m of mapping) {
+      if (m.hints.some(h => lower.includes(h))) keys.add(m.key);
+    }
+    return (this.requests || []).filter(r => keys.has(r.key));
+  }
+
+  startFieldSpecPrompt(original?: string) {
+    this.awaitingFieldSpec = true;
+    this.optionsAllowed = false;
+    this.userDeclined = false;
+    const msgs = this.agui.messages$.value.slice();
+    this.agui.messages$.next(msgs);
+    // Intentionally do not send a meta command to the agent here; wait for user input.
   }
 
   private isGreetingOnly(lower: string): boolean {
