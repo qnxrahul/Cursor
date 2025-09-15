@@ -259,9 +259,7 @@ export class AguiChatComponent implements OnInit, OnDestroy {
     this.userDeclined = false;
     const msgs = this.agui.messages$.value.slice();
     this.agui.messages$.next(msgs);
-    if (original) {
-      this.agui.send(`User wants to create a new dynamic form: ${original}. Ask for fields and CSS preferences.`);
-    }
+    // Intentionally do not send a meta command to the agent here; wait for user input.
   }
 
   private isGreetingOnly(lower: string): boolean {
