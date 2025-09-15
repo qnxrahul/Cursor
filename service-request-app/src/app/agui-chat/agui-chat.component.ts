@@ -438,9 +438,18 @@ export class AguiChatComponent implements OnInit, OnDestroy {
     if (t.includes('email')) return 'email';
     if (t.includes('number')) return 'number';
     if (t.includes('date')) return 'date';
+    if (t.includes('datetime')) return 'datetime-local';
+    if (t.includes('time')) return 'time';
     if (t.includes('select') || t.includes('dropdown')) return 'select';
     if (t.includes('radio')) return 'radio';
     if (t.includes('checkbox')) return 'checkbox';
+    if (t.includes('password')) return 'password';
+    if (t.includes('phone') || t.includes('tel')) return 'tel';
+    if (t.includes('url') || t.includes('website') || t.includes('link')) return 'url';
+    if (t.includes('color')) return 'color';
+    if (t.includes('month')) return 'month';
+    if (t.includes('week')) return 'week';
+    if (t.includes('range') || t.includes('slider')) return 'range';
     return 'text';
   }
 
@@ -459,12 +468,21 @@ export class AguiChatComponent implements OnInit, OnDestroy {
     const l = s.toLowerCase();
     if (l.includes('email')) return 'email';
     if (l.includes('date')) return 'date';
+    if (l.includes('datetime') || l.includes('date and time')) return 'datetime-local';
+    if (l.includes('time')) return 'time';
     if (l.includes('number')) return 'number';
     if (l.includes('textarea') || l.includes('text area')) return 'textarea';
     if (l.includes('select') || l.includes('dropdown')) return 'select';
     if (l.includes('radio')) return 'radio';
     if (l.includes('checkbox')) return 'checkbox';
     if (l.includes('text field')) return 'text';
+    if (l.includes('password')) return 'password';
+    if (l.includes('phone') || l.includes('tel') || l.includes('mobile')) return 'tel';
+    if (l.includes('url') || l.includes('website') || l.includes('link')) return 'url';
+    if (l.includes('color')) return 'color';
+    if (l.includes('month')) return 'month';
+    if (l.includes('week')) return 'week';
+    if (l.includes('range') || l.includes('slider')) return 'range';
     return 'text';
   }
 

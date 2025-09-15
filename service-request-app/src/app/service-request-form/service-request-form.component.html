@@ -16,6 +16,16 @@
           <input *ngSwitchCase="'email'" type="email" class="form-control" [formControlName]="f.key" />
           <input *ngSwitchCase="'number'" type="number" class="form-control" [formControlName]="f.key" />
           <input *ngSwitchCase="'date'" type="date" class="form-control" [formControlName]="f.key" />
+          <input *ngSwitchCase="'password'" type="password" class="form-control" [formControlName]="f.key" />
+          <input *ngSwitchCase="'tel'" type="tel" class="form-control" [formControlName]="f.key" />
+          <input *ngSwitchCase="'url'" type="url" class="form-control" [formControlName]="f.key" />
+          <input *ngSwitchCase="'color'" type="color" class="form-control form-control-color" [formControlName]="f.key" />
+          <input *ngSwitchCase="'time'" type="time" class="form-control" [formControlName]="f.key" />
+          <input *ngSwitchCase="'datetime'" type="datetime-local" class="form-control" [formControlName]="f.key" />
+          <input *ngSwitchCase="'datetime-local'" type="datetime-local" class="form-control" [formControlName]="f.key" />
+          <input *ngSwitchCase="'month'" type="month" class="form-control" [formControlName]="f.key" />
+          <input *ngSwitchCase="'week'" type="week" class="form-control" [formControlName]="f.key" />
+          <input *ngSwitchCase="'range'" type="range" class="form-range" [formControlName]="f.key" />
           <textarea *ngSwitchCase="'textarea'" rows="3" class="form-control" [formControlName]="f.key"></textarea>
           <select *ngSwitchCase="'select'" class="form-select" [formControlName]="f.key">
             <option *ngFor="let opt of (f.options||[])" [value]="opt">{{ opt }}</option>
