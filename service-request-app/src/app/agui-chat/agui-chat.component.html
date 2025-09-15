@@ -40,11 +40,16 @@
     <div *ngIf="state?.schema && !state?.schema_confirmed" class="mt-3">
       <div class="card border-0 shadow-sm" style="border-radius: 16px;">
         <div class="card-body">
-          <div class="d-flex justify-content-between align-items-center mb-2">
-            <strong>Adjust form fields</strong>
-            <small class="text-muted">Apply changes, then start filling</small>
+          <div class="d-flex justify-content-between align-items-center" (click)="toggleEditor()" style="cursor: pointer;">
+            <div>
+              <strong>Adjust form fields</strong>
+              <small class="text-muted ms-2">{{ state?.schema?.fields?.length || 0 }} fields</small>
+            </div>
+            <div class="text-muted">{{ editorExpanded ? '▾' : '▸' }}</div>
           </div>
-          <app-schema-editor [schema]="state?.schema" (apply)="onAgentSideApply($event)"></app-schema-editor>
+          <div *ngIf="editorExpanded" class="mt-2">
+            <app-schema-editor [schema]="state?.schema" (apply)="onAgentSideApply($event)"></app-schema-editor>
+          </div>
         </div>
       </div>
     </div>

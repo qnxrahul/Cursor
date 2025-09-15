@@ -18,6 +18,8 @@ export class AguiChatComponent implements OnInit, OnDestroy {
   optionsAllowed = false;
   matchedRequests: { key: string; label: string }[] = [];
   awaitingSchemaConfirm = false;
+  editorExpanded = false;
+  private editorInit = false;
   // Known requests (should mirror backend manifest keys)
   requests = [
     { key: 'service_auth', label: 'Service Authorization Request' },
@@ -29,7 +31,16 @@ export class AguiChatComponent implements OnInit, OnDestroy {
   constructor(public agui: AguiService) {}
 
   ngOnInit(): void {
-    this.sub = this.agui.state$.subscribe(s => { this.state = s || {}; });
+    this.sub = this.agui.state$.subscribe(s => {
+      this.state = s || {};
+      if (this.state?.schema && !this.state?.schema_confirmed && !this.editorInit) {
+        this.editorExpanded = true;
+        this.editorInit = true;
+      }
+      if (this.state?.schema_confirmed) {
+        this.editorExpanded = false;
+      }
+    });
     // Seed initial assistant greeting if no messages yet
     const existing = this.agui.messages$.value || [];
     if (existing.length === 0) {
@@ -216,7 +227,12 @@ export class AguiChatComponent implements OnInit, OnDestroy {
         ? `(${nf.options.join(', ')})` : '';
       this.agui.send(`add field ${key}:${type}${req}${opts}`);
     }
+    // Collapse editor and proceed to filling
+    this.editorExpanded = false;
+    this.agui.send('yes');
   }
+
+  toggleEditor() { this.editorExpanded = !this.editorExpanded; }
 
   get showWelcome(): boolean {
     // Show welcome chooser if no schema chosen yet
