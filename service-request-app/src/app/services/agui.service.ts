@@ -28,7 +28,7 @@ export class AguiService {
   private lastUserId: string | null = null;
   private sawAssistantThisTurn = false;
   // Loading/progress handling
-  private minLoadingMs = 600;
+  private minLoadingMs = 1500;
   private loadingStartedAt = 0;
   private loadingStopTimer: any = null;
 
