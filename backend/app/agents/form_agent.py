@@ -434,9 +434,9 @@ def build_form_agent_graph():
                 msub_global = re.search(r"submit\s*label\s*(?:should\s*be|is|:)?\s*([^\.,;\n]+)", desc, flags=re.IGNORECASE)
                 if msub_global:
                     submit_label = msub_global.group(1).strip().strip("'\"` ").title()
-                # Split description into chunks by newlines, semicolons, sentence breaks
-                # Do NOT split by comma here to preserve option lists like "IT, Service Desk, Option3"
-                raw_chunks = re.split(r"\s*(?:\band\b|\n|;|(?<=[\.!\?]))\s+", desc, flags=re.IGNORECASE)
+                # Split description into chunks by newlines, semicolons, sentence breaks, and commas not inside parentheses
+                # This preserves option lists inside parentheses, e.g., select (IT, Service Desk, Option3)
+                raw_chunks = re.split(r",(?=(?:[^()]*\([^()]*\))*[^()]*$)|\s*(?:\band\b|\n|;|(?<=[\.!\?]))\s+", desc, flags=re.IGNORECASE)
                 # additionally split on ") " boundaries (end of meta) followed by a Capitalized field start
                 refined_chunks: List[str] = []
                 for ck in raw_chunks:
