@@ -153,6 +153,20 @@ export class ServiceRequestFormComponent implements OnDestroy {
       if (!host) return;
       host.innerHTML = '';
       const card = new AdaptiveCards.AdaptiveCard();
+      // Beautiful, interactive host configuration inspired by AG-UI examples
+      card.hostConfig = new AdaptiveCards.HostConfig({
+        supportsInteractivity: true,
+        spacing: { small: 6, default: 10, medium: 16, large: 20, extraLarge: 28, padding: 14 },
+        separator: { lineThickness: 1, lineColor: "#E5E7EB" },
+        fontFamily: 'Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif',
+        fontSizes: { small: 12, default: 14, medium: 16, large: 18, extraLarge: 22 },
+        containerStyles: {
+          default: { backgroundColor: "#FFFFFF", foregroundColors: { default: { default: "#111827", subtle: "#6B7280" }, accent: { default: "#2563EB", subtle: "#60A5FA" } } },
+          emphasis: { backgroundColor: "#F9FAFB", foregroundColors: { default: { default: "#111827", subtle: "#6B7280" }, accent: { default: "#2563EB", subtle: "#60A5FA" } } }
+        },
+        actions: { actionsOrientation: 'horizontal', actionAlignment: 'stretch', maxActions: 5, buttonSpacing: 8 },
+        inputs: { errorMessage: { color: "#DC2626" } }
+      });
       card.onExecuteAction = (action: any) => {
         const data = (action && (action.data || {})) || {};
         if (data && typeof data === 'object') {
