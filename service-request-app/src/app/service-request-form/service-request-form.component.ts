@@ -13,6 +13,8 @@ export class ServiceRequestFormComponent implements OnDestroy {
   schema: any = null;
   allowSubmit = false;
   schemaConfirmed = false;
+  showEditor = false;
+  pendingRemovals = new Set<string>();
   private subs: Subscription[] = [];
 
   constructor(private fb: FormBuilder, private agui: AguiService) {
@@ -99,6 +101,30 @@ export class ServiceRequestFormComponent implements OnDestroy {
     if (this.form.valid) {
       console.log('Submit payload', this.form.value);
     }
+  }
+
+  openEditor(): void { this.showEditor = true; }
+  closeEditor(): void { this.showEditor = false; }
+
+  onApplyEdits(evt: { removeKeys: string[]; addFields: Array<{ label: string; type: string; required?: boolean; options?: string[] }> }): void {
+    // Send remove commands first
+    for (const k of evt.removeKeys || []) {
+      this.agui.send(`remove field ${k}`);
+    }
+    // Then add new fields (support options via (a,b,c))
+    for (const nf of evt.addFields || []) {
+      const key = this.keyFromLabel(nf.label);
+      const type = (nf.type || 'text').toLowerCase();
+      const req = nf.required ? ':required' : '';
+      const opts = (Array.isArray(nf.options) && nf.options.length > 0 && (type === 'select' || type === 'radio' || type === 'checkbox'))
+        ? `(${nf.options.join(', ')})` : '';
+      this.agui.send(`add field ${key}:${type}${req}${opts}`);
+    }
+    this.showEditor = false;
+  }
+
+  private keyFromLabel(label: string): string {
+    return (label || '').toLowerCase().replace(/[^a-z0-9\s]/g, '').trim().replace(/\s+/g, '_');
   }
 
   ngOnDestroy(): void {

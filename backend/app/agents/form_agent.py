@@ -760,14 +760,21 @@ def build_form_agent_graph():
             # add field key[:type[:required]]
             if low.startswith("add field"):
                 try:
-                    parts = txt.split()
-                    spec = parts[2] if len(parts) > 2 else ""
-                    segs = spec.split(":")
-                    key = segs[0]
-                    ftype = (segs[1] if len(segs) > 1 else "text").lower()
-                    req = (segs[2].lower() == "required") if len(segs) > 2 else False
+                    # Support: add field key:type[:required][(opt1,opt2)]
+                    m = re.search(r"add\s+field\s+([^\s:()]+)\s*:?\s*([a-zA-Z\- ]+)?(?:\s*:?\s*(required))?\s*(?:\(([^)]*)\))?", txt, flags=re.IGNORECASE)
+                    if not m:
+                        logger.debug("add field: no match in '%s'", txt)
+                        return state
+                    key = (m.group(1) or "").strip()
+                    raw_type = (m.group(2) or "text").strip().lower()
+                    ftype = raw_type.replace("text field", "text").replace("text area", "textarea")
+                    req = bool(m.group(3))
+                    opts_raw = (m.group(4) or "").strip()
+                    options = [o.strip() for o in re.split(r",|/|\bor\b|\band\b", opts_raw, flags=re.IGNORECASE) if o.strip()] if opts_raw else []
                     label = " ".join(key.replace("_", " ").replace("-", " ").split()).title()
-                    new_f = {"key": key, "label": label, "type": ftype, "required": req}
+                    new_f: Dict[str, Any] = {"key": key, "label": label, "type": ftype, "required": req}
+                    if options and ftype in ("select", "radio", "checkbox"):
+                        new_f["options"] = options
                     state["schema"]["fields"].append(new_f)  # type: ignore
                     logger.debug("Added field: %s", new_f)
                 except Exception:

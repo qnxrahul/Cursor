@@ -1,0 +1,49 @@
+<div class="row g-3">
+  <div class="col-12">
+    <h6 class="text-muted mb-2">Remove existing fields</h6>
+    <div class="d-flex flex-wrap gap-2">
+      <button type="button" class="btn btn-sm" *ngFor="let f of (schema?.fields||[])"
+              [ngClass]="removalSet.has(f.key) ? 'btn-danger' : 'btn-outline-secondary'"
+              (click)="toggleRemoval(f.key)">
+        {{ f.label || f.key }}
+      </button>
+    </div>
+  </div>
+
+  <div class="col-12 mt-3">
+    <h6 class="text-muted mb-2">Add new fields</h6>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle">
+        <thead>
+          <tr>
+            <th style="width:35%">Label</th>
+            <th style="width:20%">Type</th>
+            <th style="width:15%">Required</th>
+            <th>Options (comma separated)</th>
+            <th style="width:1%"></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let nf of newFields; let i = index">
+            <td><input class="form-control form-control-sm" [(ngModel)]="nf.label"></td>
+            <td>
+              <select class="form-select form-select-sm" [(ngModel)]="nf.type">
+                <option *ngFor="let t of types" [value]="t">{{ t }}</option>
+              </select>
+            </td>
+            <td><input type="checkbox" class="form-check-input" [(ngModel)]="nf.required"></td>
+            <td><input class="form-control form-control-sm" [(ngModel)]="nf.options" placeholder="Only for select/radio/checkbox"></td>
+            <td><button class="btn btn-sm btn-light" (click)="removeRow(i)">✕</button></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <button class="btn btn-sm btn-outline-primary" (click)="addRow()">+ Add field</button>
+  </div>
+
+  <div class="col-12 d-flex justify-content-end gap-2 mt-3">
+    <button class="btn btn-sm btn-light" (click)="cancel.emit()">Cancel</button>
+    <button class="btn btn-sm btn-primary" (click)="onApply()">Apply changes</button>
+  </div>
+</div>
+
