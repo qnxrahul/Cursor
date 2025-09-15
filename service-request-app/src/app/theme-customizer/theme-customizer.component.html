@@ -1,0 +1,34 @@
+<div class="card mb-3" style="border-radius: var(--app-radius); background: var(--app-card-bg);">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span>Theme Customizer</span>
+  </div>
+  <div class="card-body" style="font-family: var(--app-font); color: var(--app-text);">
+    <div class="row g-3">
+      <div class="col-6">
+        <label class="form-label">Primary Color</label>
+        <input type="color" class="form-control form-control-color" [value]="settings.primary" (input)="update('primary', $any($event.target).value)" />
+      </div>
+      <div class="col-6">
+        <label class="form-label">Accent Color</label>
+        <input type="color" class="form-control form-control-color" [value]="settings.accent" (input)="update('accent', $any($event.target).value)" />
+      </div>
+      <div class="col-6">
+        <label class="form-label">Card Background</label>
+        <input type="color" class="form-control form-control-color" [value]="settings.cardBg" (input)="update('cardBg', $any($event.target).value)" />
+      </div>
+      <div class="col-6">
+        <label class="form-label">Text Color</label>
+        <input type="color" class="form-control form-control-color" [value]="settings.text" (input)="update('text', $any($event.target).value)" />
+      </div>
+      <div class="col-6">
+        <label class="form-label">Corner Radius (px)</label>
+        <input type="range" min="0" max="24" class="form-range" [value]="settings.radius" (input)="update('radius', +$any($event.target).value)" />
+      </div>
+      <div class="col-6">
+        <label class="form-label">Font Family</label>
+        <input type="text" class="form-control" [value]="settings.font" (input)="update('font', $any($event.target).value)" />
+      </div>
+    </div>
+  </div>
+</div>
+

@@ -1,0 +1,45 @@
+{
+  "service_auth": {
+    "title": "Service Authorization Form",
+    "synonyms": ["service auth", "authorization", "service request"],
+    "fields": [
+      {"key": "name", "label": "Full Name", "type": "text", "required": true, "prompt": "Please provide your full name."},
+      {"key": "email", "label": "Email", "type": "email", "required": true, "prompt": "What is your email address?"},
+      {"key": "issue_details", "label": "Issue Details", "type": "textarea", "required": true, "prompt": "Describe the issue in detail."},
+      {"key": "type", "label": "Request Type", "type": "select", "options": ["incident", "service", "access"], "required": true, "prompt": "What type of request is this? (incident, service, access)"},
+      {"key": "urgency", "label": "Urgency", "type": "select", "options": ["low", "medium", "high", "critical"], "required": true, "prompt": "What is the urgency? (low, medium, high, critical)"},
+      {"key": "location", "label": "Location", "type": "select", "options": ["office", "site", "remote"], "required": true, "prompt": "Where is the issue located? (office/site/remote)"}
+    ]
+  },
+  "exit_request": {
+    "title": "Exit Request Form",
+    "synonyms": ["exit", "offboarding", "resignation"],
+    "fields": [
+      {"key": "name", "label": "Full Name", "type": "text", "required": true, "prompt": "Please provide the employee's full name."},
+      {"key": "email", "label": "Email", "type": "email", "required": true, "prompt": "What is the employee's email address?"},
+      {"key": "last_day", "label": "Last Working Day", "type": "date", "required": true, "prompt": "What is the last working day? (YYYY-MM-DD)"},
+      {"key": "assets_returned", "label": "Assets Returned", "type": "select", "options": ["yes", "no"], "required": true, "prompt": "Have all company assets been returned? (yes/no)"}
+    ]
+  },
+  "reimbursement": {
+    "title": "Reimbursement Form",
+    "synonyms": ["reimburse", "expense", "claim"],
+    "fields": [
+      {"key": "name", "label": "Full Name", "type": "text", "required": true, "prompt": "Your full name?"},
+      {"key": "email", "label": "Email", "type": "email", "required": true, "prompt": "Your email address?"},
+      {"key": "amount", "label": "Amount", "type": "number", "required": true, "prompt": "What is the amount to reimburse?"},
+      {"key": "category", "label": "Category", "type": "select", "options": ["travel", "meals", "supplies", "other"], "required": true, "prompt": "Which expense category? (travel, meals, supplies, other)"},
+      {"key": "description", "label": "Description", "type": "textarea", "required": false, "prompt": "Short description of the expense (optional)."}
+    ]
+  },
+  "bonafide_certificate": {
+    "title": "Bonafide Certificate Request",
+    "synonyms": ["bonafide", "certificate", "proof"],
+    "fields": [
+      {"key": "name", "label": "Full Name", "type": "text", "required": true, "prompt": "Your full name?"},
+      {"key": "email", "label": "Email", "type": "email", "required": true, "prompt": "Your email address?"},
+      {"key": "purpose", "label": "Purpose", "type": "text", "required": true, "prompt": "Purpose of the certificate?"}
+    ]
+  }
+}
+

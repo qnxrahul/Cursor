@@ -1,0 +1,35 @@
+<div class="d-flex flex-column" style="min-height: 300px">
+  <div class="flex-grow-1 overflow-auto p-2 mb-2">
+    
+    <!-- Chat messages -->
+    <div class="border rounded p-2 bg-light">
+      <div *ngFor="let m of agui.messages$ | async" class="mb-2">
+        <div [ngClass]="{'text-end': m.role==='user'}">
+          <span class="badge bg-secondary me-1" *ngIf="m.role==='assistant'">Agent</span>
+          <span class="badge bg-primary ms-1" *ngIf="m.role==='user'">You</span>
+        </div>
+        <div [ngClass]="{'bg-primary text-white': m.role==='user','bg-white border': m.role==='assistant'}"
+             class="d-inline-block px-3 py-2 rounded-3">
+          {{ m.text }}
+        </div>
+      </div>
+    </div>
+
+    <!-- Welcome chooser moved below chat -->
+    <div *ngIf="showWelcome" class="mt-3">
+      <div class="card" style="border-radius: var(--app-radius);">
+        <div class="card-body" style="background: var(--app-card-bg); color: var(--app-text); font-family: var(--app-font);">
+          <p class="mb-3">I can help you create and submit IT helpdesk related requests. Here are some requests I can create right away, or you can describe a new form.</p>
+          <div class="d-flex flex-wrap gap-2">
+            <button class="btn btn-sm btn-outline-primary" *ngFor="let r of requests" (click)="choose(r.key)">{{ r.label }}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+  <div class="input-group">
+    <input [(ngModel)]="input" (keyup.enter)="send()" class="form-control" />
+  </div>
+</div>
+

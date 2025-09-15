@@ -1,0 +1,58 @@
+{
+  "domain": "Service Desk Intake",
+  "notes": "Field-aware guidance for collecting service/auth requests with high-quality, minimally ambiguous answers.",
+  "fields": {
+    "name": {
+      "purpose": "Identify the requester with a full legal name.",
+      "format": "First Last (Title Case). Avoid extra words.",
+      "examples": [
+        "Rahul Sharma",
+        "Priya Kapoor"
+      ]
+    },
+    "email": {
+      "purpose": "Contact for follow-up and verification.",
+      "format": "Valid email address. Prefer company domain if available.",
+      "examples": [
+        "rahul.sharma@example.com",
+        "priya.kapoor@company.co"
+      ],
+      "validation": "Must match standard email pattern user@domain.tld"
+    },
+    "issue_details": {
+      "purpose": "Brief, actionable description that enables triage.",
+      "format": "1-3 sentences including what/where/impact. Exclude greetings.",
+      "examples": [
+        "Wi‑Fi drops frequently on 3rd floor near conference rooms; affecting calls.",
+        "Unable to access Jira; SSO fails with ‘Invalid session’."
+      ]
+    },
+    "type": {
+      "purpose": "Route to the correct workflow.",
+      "format": "One of: incident (break/fix), service (new/change), access (permission).",
+      "examples": [
+        "incident",
+        "service",
+        "access"
+      ]
+    },
+    "urgency": {
+      "purpose": "Prioritize response.",
+      "format": "One of: low, medium, high, critical. Choose based on scope/impact.",
+      "guidance": "Critical: outage or severe impact; High: major impact; Medium: limited impact; Low: minor/inconvenience.",
+      "examples": [
+        "high",
+        "medium"
+      ]
+    },
+    "location": {
+      "purpose": "Identify where the issue manifests.",
+      "format": "One of: office, site, remote. Synonyms: office=hq/headquarters, site=onsite/on site, remote=home/wfh.",
+      "examples": [
+        "office",
+        "remote"
+      ]
+    }
+  }
+}
+
