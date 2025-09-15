@@ -139,6 +139,7 @@ export class AguiService {
           if (raw.form_type) next.form_type = raw.form_type;
           if (raw.theme) next.theme = raw.theme;
           if (typeof raw.schema_confirmed === 'boolean') next.schema_confirmed = raw.schema_confirmed;
+          if (raw.card) next.card = raw.card;
         }
         if (e.snapshot && typeof e.snapshot === 'object') {
           // Some adapters put state at root or under snapshot.state
@@ -155,6 +156,7 @@ export class AguiService {
             if (sstate.form_type) next.form_type = sstate.form_type;
             if (sstate.theme) next.theme = sstate.theme;
             if (typeof sstate.schema_confirmed === 'boolean') next.schema_confirmed = sstate.schema_confirmed;
+            if (sstate.card) next.card = sstate.card;
           }
           // Also sync messages if provided
           const msgs = (snap as any).messages || (sstate && (sstate as any).messages);
