@@ -31,7 +31,11 @@ export class AguiChatComponent implements OnInit, OnDestroy {
     // Seed initial assistant greeting if no messages yet
     const existing = this.agui.messages$.value || [];
     if (existing.length === 0) {
-      this.agui.messages$.next([{ role: 'assistant', text: 'Hi, how may I help you?' }]);
+      this.agui.messages$.next([{
+        role: 'assistant',
+        text: "Hi, I'm HelpDesk Assistant. I can help you create and submit IT helpdesk related requests. Here are some requests I can create right away, or you can instruct me to create a dynamic form for you."
+      }]);
+      this.optionsAllowed = true;
     }
   }
 
