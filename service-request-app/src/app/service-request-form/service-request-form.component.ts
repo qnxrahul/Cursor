@@ -164,7 +164,15 @@ export class ServiceRequestFormComponent implements OnDestroy {
           default: { backgroundColor: "#FFFFFF", foregroundColors: { default: { default: "#111827", subtle: "#6B7280" }, accent: { default: "#2563EB", subtle: "#60A5FA" } } },
           emphasis: { backgroundColor: "#F9FAFB", foregroundColors: { default: { default: "#111827", subtle: "#6B7280" }, accent: { default: "#2563EB", subtle: "#60A5FA" } } }
         },
-        actions: { actionsOrientation: 'horizontal', actionAlignment: 'stretch', maxActions: 5, buttonSpacing: 8 },
+        actions: {
+          actionsOrientation: 'horizontal',
+          actionAlignment: 'stretch',
+          maxActions: 5,
+          buttonSpacing: 10,
+          showCard: { actionMode: 'inline', inlineTopMargin: 10 },
+          buttonSpacingDefinition: { spacing: 10 },
+          iconPlacement: 'leftOfTitle'
+        },
         inputs: { errorMessage: { color: "#DC2626" } }
       });
       card.onExecuteAction = (action: any) => {

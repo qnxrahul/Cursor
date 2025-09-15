@@ -245,9 +245,9 @@ def build_form_agent_graph():
                 {"type": "Input.Text", "placeholder": "Key or Label to remove", "id": "remove"}
             ],
             "actions": [
-                {"type": "Action.Submit", "title": "➕ Add Field", "data": {"action": "fb_add", "bind": ["label","type","required","options"]}},
-                {"type": "Action.Submit", "title": "🗑 Remove Field", "data": {"action": "fb_remove", "bind": ["remove"]}},
-                {"type": "Action.Submit", "title": "✅ Done", "data": {"action": "fb_done"}}
+                {"type": "Action.Submit", "title": "➕ Add Field", "style": "positive", "data": {"action": "fb_add", "bind": ["label","type","required","options"]}},
+                {"type": "Action.Submit", "title": "🗑 Remove Field", "style": "destructive", "data": {"action": "fb_remove", "bind": ["remove"]}},
+                {"type": "Action.Submit", "title": "✅ Done", "style": "positive", "data": {"action": "fb_done"}}
             ]
         }
 
