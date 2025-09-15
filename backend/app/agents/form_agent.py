@@ -449,14 +449,20 @@ def build_form_agent_graph():
                     t = re.sub(r"\bdate\b", "", t, flags=re.IGNORECASE)
                     t = re.sub(r"\bdropdown\b", "", t, flags=re.IGNORECASE)
                     t = re.sub(r"\boptional\b", "", t, flags=re.IGNORECASE)
+                    t = re.sub(r"\bas\b\.?$", "", t.strip(), flags=re.IGNORECASE)
+                    t = re.sub(r"\.$", "", t.strip())
                     t = re.sub(r"\s+", " ", t).strip()
                     return " ".join([w.capitalize() for w in t.split(" ") if w]) or "Field"
 
                 nat_fields: List[Dict[str, Any]] = []
                 desc = spec_text
-                # Remove noisy prefixes like "Parsed fields:" or quotes artefacts
+                # Remove noisy prefixes/boilerplate and quotes artefacts
                 desc = re.sub(r"parsed\s*fields\s*:\s*", "", desc, flags=re.IGNORECASE)
+                desc = re.sub(r"^\s*i will render the\s+'[^']+'\s+with these fields:\s*", "", desc, flags=re.IGNORECASE)
+                desc = re.sub(r"reply\s+'?yes'?[\s\S]*$", "", desc, flags=re.IGNORECASE)
                 desc = desc.replace("“", '"').replace("”", '"').replace("’", "'")
+                # Convert inline dash bullets into newline bullets
+                desc = re.sub(r"\s+-\s+", "\n- ", desc)
                 # Extract submit label globally (supports 'Submit label should be Send.')
                 msub_global = re.search(r"submit\s*label\s*(?:should\s*be|is|:)?\s*([^\.,;\n]+)", desc, flags=re.IGNORECASE)
                 if msub_global:
@@ -581,6 +587,9 @@ def build_form_agent_graph():
                             from datetime import datetime
                             y = datetime.utcnow().year
                             options = [f"FY{y-1}-{y}", f"FY{y}-{y+1}", f"FY{y+1}-{y+2}"]
+                        # If options were found but type remained text, upgrade to select
+                        if not (ftype in ("select", "radio", "checkbox")) and options:
+                            ftype = "select"
 
                     # derive label and key
                     label_src = s.split("(")[0] if "(" in s else s
