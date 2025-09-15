@@ -27,6 +27,10 @@ export class AguiService {
   private lastUserText: string | null = null;
   private lastUserId: string | null = null;
   private sawAssistantThisTurn = false;
+  // Loading/progress handling
+  private minLoadingMs = 600;
+  private loadingStartedAt = 0;
+  private loadingStopTimer: any = null;
 
   private uuid(): string {
     try { return (crypto as any).randomUUID(); } catch { return `id-${Date.now()}-${Math.random().toString(16).slice(2)}`; }
@@ -35,7 +39,7 @@ export class AguiService {
   start(threadId?: string) {
     if (this.started) return;
     this.started = true;
-    this.loading$.next(true);
+    this.beginLoading();
     const tid = threadId || this.threadId$.value || this.uuid();
     this.threadId$.next(tid);
     const runInput: any = {
@@ -73,7 +77,7 @@ export class AguiService {
       context: [],
       forwardedProps: { node_name: "entry_cleanup", command: {} }
     };
-    this.loading$.next(true);
+    this.beginLoading();
     const events$ = (this.agent as any).run(runInput);
     (events$ as any).subscribe((e: any) => this.onEvent(e));
   }
@@ -90,7 +94,7 @@ export class AguiService {
         this.turnHasTextStream = false;
         // Do not reset lastSnapshotHash here; keep across runs to avoid re-appending identical prompts
         this.sawAssistantThisTurn = false;
-        this.loading$.next(true);
+        this.beginLoading();
         break;
       case EventType.TEXT_MESSAGE_START: {
         this.turnHasTextStream = true;
@@ -229,8 +233,28 @@ export class AguiService {
         // allow new sends after run finishes
         this.turnHasTextStream = false;
         this.sawAssistantThisTurn = false;
-        this.loading$.next(false);
+        this.endLoading();
         break;
     }
+  }
+
+  private beginLoading() {
+    if (this.loadingStopTimer) {
+      clearTimeout(this.loadingStopTimer);
+      this.loadingStopTimer = null;
+    }
+    this.loadingStartedAt = Date.now();
+    if (!this.loading$.value) this.loading$.next(true);
+  }
+
+  private endLoading() {
+    const elapsed = Date.now() - this.loadingStartedAt;
+    const remain = this.minLoadingMs - elapsed;
+    const delay = remain > 0 ? remain : 0;
+    if (this.loadingStopTimer) clearTimeout(this.loadingStopTimer);
+    this.loadingStopTimer = setTimeout(() => {
+      this.loading$.next(false);
+      this.loadingStopTimer = null;
+    }, delay);
   }
 }
