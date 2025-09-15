@@ -434,8 +434,9 @@ def build_form_agent_graph():
                 msub_global = re.search(r"submit\s*label\s*(?:should\s*be|is|:)?\s*([^\.,;\n]+)", desc, flags=re.IGNORECASE)
                 if msub_global:
                     submit_label = msub_global.group(1).strip().strip("'\"` ").title()
-                # split description into chunks by ',', 'and', newlines, semicolons, periods
-                raw_chunks = re.split(r"\s*(?:,|\band\b|\n|;|\.)\s+", desc, flags=re.IGNORECASE)
+                # Split description into chunks by newlines, semicolons, sentence breaks
+                # Do NOT split by comma here to preserve option lists like "IT, Service Desk, Option3"
+                raw_chunks = re.split(r"\s*(?:\band\b|\n|;|(?<=[\.!\?]))\s+", desc, flags=re.IGNORECASE)
                 # additionally split on ") " boundaries (end of meta) followed by a Capitalized field start
                 refined_chunks: List[str] = []
                 for ck in raw_chunks:
@@ -446,11 +447,17 @@ def build_form_agent_graph():
                 raw_chunks = [c.strip() for c in refined_chunks if c.strip()]
                 for chunk in raw_chunks:
                     s = chunk.strip()
+                    # Remove leading bullet markers
+                    s = re.sub(r"^[-*]\s*", "", s)
                     if not s:
                         continue
                     low = s.lower()
                     # skip submit label chunks (handled globally)
                     if "submit label" in low:
+                        continue
+                    # Standalone yes/no item -> radio yes/no
+                    if re.fullmatch(r"yes\s*/\s*no|yes\s*no|yes\s*or\s*no", low, flags=re.IGNORECASE):
+                        nat_fields.append({"key": "confirmation", "label": "Confirmation", "type": "radio", "required": False, "options": ["Yes", "No"]})
                         continue
                     # infer type
                     ftype = "text"
@@ -510,6 +517,7 @@ def build_form_agent_graph():
                         elif re.search(r"\bradio\b", low):
                             ftype = "radio"
                         elif re.search(r"\bcheckbox\b|check\s*boxes", low):
+                            # If user says 'checkbox' without options, prefer radio yes/no for boolean intent
                             ftype = "checkbox"
 
                     # parse options
@@ -529,6 +537,17 @@ def build_form_agent_graph():
                                 t = token.strip()
                                 if t:
                                     options.append(t)
+                        mhaving = re.search(r"having\s+options?\s+([\w\-\s,\/]+)", low)
+                        if mhaving:
+                            raw = mhaving.group(1)
+                            for token in re.split(r"/|,|\bor\b|\band\b", raw, flags=re.IGNORECASE):
+                                t = token.strip()
+                                if t:
+                                    options.append(t)
+                        # If user said 'checkbox' but no options were parsed, treat as boolean yes/no
+                        if ftype == "checkbox" and not options:
+                            ftype = "radio"
+                            options = ["Yes", "No"]
                         if re.search(r"yes\s*/\s*no|yes\s*no", low):
                             options = ["yes", "no"]
                         if re.search(r"fiscal year", low) and not options:
