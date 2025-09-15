@@ -170,8 +170,21 @@ def build_form_agent_graph():
                     "- theme {\"primary\": \"#0052cc\", ...}\n"
                     "Describe edits naturally if you prefer."
                 ))]}
-            # No message; UI presents editor/options
-            return {}
+            # Provide an adaptive card to drive edits without LLM tokens
+            ac = {
+                "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+                "type": "AdaptiveCard",
+                "version": "1.5",
+                "body": [
+                    {"type": "TextBlock", "text": "Adjust the form or proceed", "weight": "Bolder", "size": "Medium"},
+                    {"type": "TextBlock", "isSubtle": True, "wrap": True, "text": "Use the editor below to add/remove fields, then start filling."}
+                ],
+                "actions": [
+                    {"type": "Action.Submit", "title": "Open Editor", "data": {"action": "schema_edit"}},
+                    {"type": "Action.Submit", "title": "Start Filling", "data": {"action": "proceed"}}
+                ]
+            }
+            return {"card": ac}
 
         # If awaiting confirmation, ask to confirm the pending value
         if state.get("awaiting_confirmation") and state.get("pending_field_index") is not None:
@@ -692,6 +705,23 @@ def build_form_agent_graph():
                 except Exception:
                     logger.exception("LLM classify confirmation failed")
                 return None
+
+            # Support compact Adaptive Card action payloads
+            try:
+                if txt.strip().startswith('{') and '"ac"' in txt:
+                    obj = json.loads(txt)
+                    ac = obj.get('ac') or {}
+                    act = (ac.get('action') or '').lower()
+                    if act == 'schema_edit':
+                        state["awaiting_schema_changes"] = True
+                        logger.debug("AC action -> schema_edit")
+                        return state
+                    if act == 'proceed':
+                        state["schema_confirmed"] = True
+                        logger.debug("AC action -> proceed")
+                        return state
+            except Exception:
+                logger.exception("Failed to parse AC action payload")
 
             label = classify_confirmation_intent(txt)
             if label == "YES":

@@ -10,6 +10,7 @@
   },
   "private": true,
   "dependencies": {
+    "adaptivecards": "^3.0.0",
     "@ag-ui/client": "^0.0.37",
     "@angular/animations": "^18.2.0",
     "@angular/common": "^18.2.0",

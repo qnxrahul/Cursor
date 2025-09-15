@@ -1,6 +1,7 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { Subscription } from 'rxjs';
 import { AguiService } from '../services/agui.service';
+import * as AdaptiveCards from 'adaptivecards';
 
 @Component({
   selector: 'app-agui-chat',
@@ -20,6 +21,8 @@ export class AguiChatComponent implements OnInit, OnDestroy {
   awaitingSchemaConfirm = false;
   editorExpanded = false;
   private editorInit = false;
+  // Adaptive card container id
+  private cardContainerId = 'agui-card-host';
   // Known requests (should mirror backend manifest keys)
   requests = [
     { key: 'service_auth', label: 'Service Authorization Request' },
@@ -39,6 +42,11 @@ export class AguiChatComponent implements OnInit, OnDestroy {
       }
       if (this.state?.schema_confirmed) {
         this.editorExpanded = false;
+      }
+      // Render adaptive card if provided by backend
+      const card = (this.state && (this.state as any).card) as any;
+      if (card) {
+        setTimeout(() => this.renderAdaptiveCard(card));
       }
     });
     // Seed initial assistant greeting if no messages yet
@@ -233,6 +241,26 @@ export class AguiChatComponent implements OnInit, OnDestroy {
   }
 
   toggleEditor() { this.editorExpanded = !this.editorExpanded; }
+
+  private renderAdaptiveCard(cardPayload: any) {
+    try {
+      const container = document.getElementById(this.cardContainerId);
+      if (!container) return;
+      container.innerHTML = '';
+      const card = new AdaptiveCards.AdaptiveCard();
+      card.onExecuteAction = (action: any) => {
+        const data = (action && (action.data || {})) || {};
+        if (data && typeof data === 'object') {
+          // Prefer compact JSON actions to reduce tokens
+          const payload = JSON.stringify({ ac: data });
+          this.agui.send(payload);
+        }
+      };
+      card.parse(cardPayload);
+      const rendered = card.render();
+      if (rendered) container.appendChild(rendered);
+    } catch {}
+  }
 
   get showWelcome(): boolean {
     // Show welcome chooser if no schema chosen yet
