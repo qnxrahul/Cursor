@@ -158,7 +158,7 @@ def build_form_agent_graph():
             )
             return {"messages": [AIMessage(content=hint)]}
 
-        # If schema chosen but not confirmed, present fields and ask for changes
+        # If schema chosen but not confirmed, suppress preview message (chat-side editor handles changes)
         if not state.get("schema_confirmed"):
             # If user already said they want changes, proactively ask for specifics
             if state.get("awaiting_schema_changes"):
@@ -170,13 +170,8 @@ def build_form_agent_graph():
                     "- theme {\"primary\": \"#0052cc\", ...}\n"
                     "Describe edits naturally if you prefer."
                 ))]}
-            fields = [f.get("label") or f.get("key") for f in state["schema"].get("fields", [])]
-            preview = "\n - " + "\n - ".join(fields) if fields else " (no fields)"
-            msg = (
-                f"I have rendered the '{state.get('form_type')}' with these fields:{preview}\n"
-                "You can now add or remove fields (e.g., add field amount:number:required, remove field urgency) or update theme. No need to say yes or no."
-            )
-            return {"messages": [AIMessage(content=msg)]}
+            # No message; UI presents editor/options
+            return {}
 
         # If awaiting confirmation, ask to confirm the pending value
         if state.get("awaiting_confirmation") and state.get("pending_field_index") is not None:
