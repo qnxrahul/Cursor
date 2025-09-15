@@ -121,7 +121,7 @@ export class AguiChatComponent implements OnInit, OnDestroy {
     // If input matches a known request, route to backend immediately
     const reqKeyEarly = this.parseRequestKey(lower);
     if (reqKeyEarly) {
-      this.agui.send(reqKeyEarly);
+      this.agui.send(reqKeyEarly!);
       this.optionsAllowed = false;
       this.input = '';
       return;
@@ -257,13 +257,9 @@ export class AguiChatComponent implements OnInit, OnDestroy {
     this.awaitingFieldSpec = true;
     this.optionsAllowed = false;
     this.userDeclined = false;
-    const ask = 'Sure — list the fields and any CSS preferences (primary, accent, card background, text color, corner radius, font). For example: name:text (required), age:number, start_date:date, department:select (HR, Finance, IT).';
     const msgs = this.agui.messages$.value.slice();
-    msgs.push({ role: 'assistant', text: ask });
     this.agui.messages$.next(msgs);
-    if (original) {
-      this.agui.send(`User wants to create a new dynamic form: ${original}. Ask for fields and CSS preferences.`);
-    }
+    // Intentionally do not send a meta command to the agent here; wait for user input.
   }
 
   private isGreetingOnly(lower: string): boolean {
