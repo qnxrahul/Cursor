@@ -2,32 +2,35 @@
   <div class="flex-grow-1 overflow-auto p-2 mb-2">
     
     <!-- Chat messages -->
-    <div class="border rounded p-2 bg-light">
-      <div *ngFor="let m of agui.messages$ | async" class="mb-2">
-        <div [ngClass]="{'text-end': m.role==='user'}">
-          <span class="badge bg-secondary me-1" *ngIf="m.role==='assistant'">Agent</span>
-          <span class="badge bg-primary ms-1" *ngIf="m.role==='user'">You</span>
-        </div>
-        <div [ngClass]="{'bg-primary text-white': m.role==='user','bg-white border': m.role==='assistant'}"
-             class="d-inline-block px-3 py-2 rounded-3">
-          {{ m.text }}
+    <div class="p-0">
+      <div *ngFor="let m of agui.messages$ | async" class="mb-2 d-flex" [ngClass]="{'justify-content-end': m.role==='user'}">
+        <div class="d-flex align-items-start" [ngClass]="{'flex-row-reverse': m.role==='user'}">
+          <div class="rounded-circle d-inline-flex align-items-center justify-content-center me-2 ms-2"
+               [ngClass]="m.role==='assistant' ? 'bg-secondary text-white' : 'bg-primary text-white'"
+               style="width:28px;height:28px;font-size:12px;">{{ m.role==='assistant' ? 'A' : 'U' }}</div>
+          <div class="shadow-sm" [ngClass]="m.role==='assistant' ? 'bg-white' : 'bg-primary text-white'"
+               style="border-radius:14px;padding:10px 12px; max-width: 85%;">
+            {{ m.text }}
+          </div>
         </div>
       </div>
     </div>
 
     <!-- Welcome and smart suggestions -->
     <div *ngIf="showWelcome" class="mt-3">
-      <div class="card" style="border-radius: var(--app-radius);">
+      <div class="card border-0 shadow-sm" style="border-radius: 16px;">
         <div class="card-body" style="background: var(--app-card-bg); color: var(--app-text); font-family: var(--app-font);">
           <ng-container *ngIf="(matchedRequests?.length || 0) > 0; else customHelp">
             <p class="mb-3">These seem relevant based on your message. Choose one below, or describe your form fields.</p>
             <div class="d-flex flex-wrap gap-2">
-              <button class="btn btn-sm btn-outline-primary" *ngFor="let r of matchedRequests" (click)="choose(r.key)">{{ r.label }}</button>
+              <button class="btn btn-sm btn-outline-primary" *ngFor="let r of matchedRequests" (click)="choose(r.key)">
+                <span class="me-1">✅</span>{{ r.label }}
+              </button>
             </div>
           </ng-container>
           <ng-template #customHelp>
             <p class="mb-3">Paste your form fields or describe them (e.g., name:text (required), email:email, status:select (Pending, Approved)).</p>
-            <button class="btn btn-sm btn-primary" (click)="startFieldSpecPrompt()">Describe a new form</button>
+            <button class="btn btn-sm btn-primary" (click)="startFieldSpecPrompt()"><span class="me-1">📝</span>Describe a new form</button>
           </ng-template>
         </div>
       </div>

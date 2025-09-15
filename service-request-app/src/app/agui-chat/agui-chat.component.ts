@@ -17,6 +17,7 @@ export class AguiChatComponent implements OnInit, OnDestroy {
   awaitingYesNo = false;
   optionsAllowed = false;
   matchedRequests: { key: string; label: string }[] = [];
+  awaitingSchemaConfirm = false;
   // Known requests (should mirror backend manifest keys)
   requests = [
     { key: 'service_auth', label: 'Service Authorization Request' },
@@ -48,6 +49,34 @@ export class AguiChatComponent implements OnInit, OnDestroy {
     if (!t) return;
     this.hasUserResponded = true;
     const lower = t.toLowerCase();
+    // If schema rendered but awaiting confirmation, treat yes/no conversationally here
+    if (!this.state?.schema_confirmed && this.state?.schema && this.state?.schema.fields?.length && this.awaitingSchemaConfirm) {
+      const msgs = this.agui.messages$.value.slice();
+      msgs.push({ role: 'user', text: t });
+      if (this.isAffirmative(t)) {
+        // User wants to proceed: say ok and let backend ask first field next
+        msgs.push({ role: 'assistant', text: 'Great! Let’s start filling the form.' });
+        this.agui.messages$.next(msgs);
+        this.agui.send('yes');
+        this.awaitingSchemaConfirm = false;
+        this.input = '';
+        return;
+      }
+      if (this.isNegative(t)) {
+        // User wants to change fields
+        msgs.push({ role: 'assistant', text: 'Tell me what to change. You can remove fields, add new ones, or update theme/CSS.' });
+        this.agui.messages$.next(msgs);
+        this.agui.send('no');
+        this.awaitingSchemaConfirm = true;
+        this.input = '';
+        return;
+      }
+      // Not a yes/no, forward to agent as a modification request
+      this.agui.messages$.next(msgs);
+      this.agui.send(t);
+      this.input = '';
+      return;
+    }
 
     // We avoid rigid yes/no gating; make it more conversational.
 

@@ -38,6 +38,9 @@ export class ServiceRequestFormComponent implements OnDestroy {
             group[key] = new FormControl(initial, validators);
           }
           this.form = this.fb.group(group);
+          // Signal chat to ask for confirmation in the chat UI on first schema render
+          const prev = this.agui.state$.value || {};
+          this.agui.state$.next({ ...prev, schema_confirmed: !!prev['schema_confirmed'] });
         }
       }
       if (st && st['form']) {
