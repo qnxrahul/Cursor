@@ -1,0 +1,7 @@
+﻿################################################################################
+# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
+################################################################################
+
+/.vs
+/service-request-app/.angular/cache/18.2.20/service-request-app/vite/deps/@ag-ui_client.js
+/service-request-app
